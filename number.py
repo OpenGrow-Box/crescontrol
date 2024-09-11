@@ -42,14 +42,14 @@ async def async_setup_entry(hass, entry, async_add_entities):
 class CresControlNumber(CoordinatorEntity, NumberEntity):
     def __init__(self, coordinator, device_name, entry, device_type):
         super().__init__(coordinator)
-        self._device_name = device_name.lower()  # Konsistente Normalisierung
+        self._device_name = device_name.lower()  
         self._entry = entry
         self._device_type = device_type
 
     @property
     def device_info(self):
         """Return device information about this entity."""
-        device_id_normalized = self._device_name.lower()  # Konsistente Normalisierung
+        device_id_normalized = self._device_name.lower()  
 
         if self._device_type == "input":
             device_id = f"{DOMAIN}_input_{device_id_normalized}"
@@ -398,11 +398,11 @@ class CresOutputCalibFactorNumber(CresControlNumber):
 
     @property
     def min_value(self):
-        return 1  # Allow calibration factor to be 0 or higher
+        return 1  
 
     @property
     def max_value(self):
-        return 10  # Setting max to 100 as an example, adjust as needed
+        return 10  
 
     @property
     def step(self):
@@ -481,12 +481,12 @@ class CresOutputPWMFrequencyNumber(CresControlNumber):
             self._output_name
         ].get("pwmFrequency", 0)
         
-        # Verwende safe_float_conversion, um den Wert in float umzuwandeln
+        
         converted_value = safe_float_conversion(
             raw_value, f"Output {self._output_name}", "PWM Frequency"
         )
         
-        # Stelle sicher, dass der Wert nicht unter dem minimalen Wert liegt
+        
         if converted_value < self.min_value:
             _LOGGER.warning(
                 f"PWM Frequency für Output {self._output_name} ist unter dem minimalen Wert {self.min_value} Hz. Setze auf {self.min_value} Hz."
@@ -537,12 +537,12 @@ class CresSwitchPWMFrequencyNumber(CresControlNumber):
             self._switch_name
         ].get("pwm-frequency", 0)
         
-        # Verwende safe_float_conversion, um den Wert in float umzuwandeln
+       
         converted_value = safe_float_conversion(
             raw_value, f"Switch {self._switch_name}", "PWM Frequency"
         )
         
-        # Stelle sicher, dass der Wert nicht unter dem minimalen Wert liegt
+        
         if converted_value < self.min_value:
             _LOGGER.warning(
                 f"PWM Frequency für Switch {self._switch_name} ist unter dem minimalen Wert {self.min_value} Hz. Setze auf {self.min_value} Hz."
@@ -629,7 +629,7 @@ class CresOutputThresholdNumber(CresControlNumber):
 
     @property
     def value(self):
-        # Prüfen, ob der Threshold-Wert existiert, bevor er abgerufen wird
+        
         raw_value = self.coordinator.controller.outputs.outputs_data[self._output_name].get(
             "threshold", 0
         )

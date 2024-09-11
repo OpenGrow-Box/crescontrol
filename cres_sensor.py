@@ -8,13 +8,13 @@ class CresSensors:
     def __init__(self, reqAddr):
         self.req = CresRequest(reqAddr)
         self.sensors = []
-        self.sensor_data = {}  # Store sensor data in a dictionary
+        self.sensor_data = {} 
 
     async def get_sensors(self):
         """Fetch the list of sensors."""
         sensor_data = await self.req._get_request("extension:get-all()")
-        # Ensure sensor_ids is a clean list of sensor strings
-        sensor_ids = sensor_data.strip("[]").replace('"', "").split(",")  # Split IDs
+
+        sensor_ids = sensor_data.strip("[]").replace('"', "").split(",") 
 
         self.sensors = sensor_ids if isinstance(sensor_ids, list) else [sensor_ids]
 
@@ -22,7 +22,7 @@ class CresSensors:
 
     async def update_sensor_data(self):
         """Update sensor data by fetching all relevant data in one pass."""
-        self.sensor_data = {}  # Clear previous data
+        self.sensor_data = {}  
 
         for sensor_id in self.sensors:
             try:
@@ -38,13 +38,13 @@ class CresSensors:
         """Fetch all data for a specific sensor in a single API request."""
         sensor_state = {}
         try:
-            # Combine multiple requests into one to reduce the number of API calls
+
             response = await self.req._get_request(
                 f"extension:{sensor_id}:humidity;extension:{sensor_id}:temperature;extension:{sensor_id}:vpd"
                 + (f";extension:{sensor_id}:co2-concentration" if "co2" in sensor_id.lower() else "")
             )
 
-            # Split the response and assign values
+
             values = response.split(";")
             humidity, temperature, vpd = values[0], values[1], values[2]
 

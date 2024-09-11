@@ -7,7 +7,7 @@ class CresInputs:
         self.inputList = inputList
         self.inputs_data = {}
         self.devices = ["a", "b"]
-        # Initialize inputs data structure without 'meta'
+
         for input_name in self.inputList:
             self.inputs_data[input_name] = {
                 "voltage": "",
@@ -16,7 +16,7 @@ class CresInputs:
             }
 
     def configureInputs(self, inputList):
-        # Update the input list dynamically if needed
+
         self.inputList = inputList
         for input_name in self.inputList:
             self.inputs_data[input_name] = {+                      
@@ -29,27 +29,26 @@ class CresInputs:
 ## Multi Device Request
     async def getAllInputsData(self):
         """Fetch all input data with a single request for all inputs."""
-        # Kombinierter Request, um alle Input-Daten auf einmal abzurufen
+
         request_string = ";".join([f"in-{input_name}:voltage;in-{input_name}:calib-offset;in-{input_name}:calib-factor" for input_name in self.inputList])
         
-        # Sende den kombinierten Request
+
         response = await self.req._get_request(request_string)
 
-        # Überprüfen, ob die Antwort gültig ist
         if response is None or "error" in response.lower():
             raise ValueError(f"Error fetching input data: {response}")
 
-        # Aufteilen der Antworten
+
         try:
             split_response = response.split(";")
             
-            # Zuweisen der Antworten zu den jeweiligen Inputs
+
             for i, input_name in enumerate(self.inputList):
                 voltage = float(split_response[i * 3])
                 calibOffset = float(split_response[i * 3 + 1])
                 calibFactor = float(split_response[i * 3 + 2])
 
-                # Daten für den Input speichern
+
                 self.inputs_data[input_name] = {
                     "voltage": voltage,
                     "calibOffset": calibOffset,
@@ -57,7 +56,7 @@ class CresInputs:
                 }
 
         except ValueError as e:
-            # Fehler beim Parsen der Antwort
+
             raise ValueError(f"Error parsing input data: {response}") from e
 
         return self.inputs_data
@@ -96,7 +95,7 @@ class CresInputs:
         return self.inputs_data[input_name]["calibFactor"]
 
     async def update_input(self,input_name):
-        # Loop through all inputs and update their values without 'meta'
+
         await self.get_input_voltage(input_name)
         await self.get_input_calib_offset(input_name)
         await self.get_input_calib_factor(input_name)
@@ -104,15 +103,15 @@ class CresInputs:
     async def update_inputs(self):
         """Fetch all input data with a single request."""
         for input_name in self.inputList:
-            # Kombiniere alle Abfragen für den Input
+
             response = await self.req._get_request(
                 f"in-{input_name}:voltage;in-{input_name}:calib-offset;in-{input_name}:calib-factor"
             )
 
-            # Antworte aufsplitten
+
             voltage, calibOffset, calibFactor = response.split(";")
 
-            # Daten speichern
+
             self.inputs_data[input_name] = {
                 "voltage": float(voltage),
                 "calibOffset": float(calibOffset),

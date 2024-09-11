@@ -1,4 +1,3 @@
-# CresFan Subclass with a new method updateFanData()
 from .cres_req import CresRequest
 
 
@@ -6,30 +5,30 @@ class CresFan:
     def __init__(self, reqAddr):
         self.req = CresRequest(reqAddr)
         self.enabled: bool = False
-        self.duty_cycle: float = 0.0  # Ändere zu float, da der Wert Dezimalstellen hat
-        self.min_duty_cycle: float = 0.0  # Ändere zu float
+        self.duty_cycle: float = 0.0  
+        self.min_duty_cycle: float = 0.0 
 
 ## MULTI REQUESTS
     async def getAllFanData(self):
         """Fetch all Fan data with a single request."""
-        # Kombinierter Request, um alle Fan-Daten auf einmal abzurufen
+        
         response = await self.req._get_request(
             "fan:enabled;fan:duty-cycle;fan:duty-cycle-min"
         )
 
-        # Überprüfen, ob die Antwort gültig ist
+       
         if response is None or "error" in response.lower():
             raise ValueError(f"Error fetching fan data: {response}")
 
-        # Antwort aufsplitten und die Werte zuweisen
+        
         try:
             enabled, duty_cycle, min_duty_cycle = response.split(";")
-            # Zuweisungen vornehmen
+
             self.enabled = enabled == "1"
-            self.duty_cycle = float(duty_cycle)  # Konvertiere zu float
-            self.min_duty_cycle = float(min_duty_cycle)  # Konvertiere zu float
+            self.duty_cycle = float(duty_cycle) 
+            self.min_duty_cycle = float(min_duty_cycle)  
         except ValueError as e:
-            # Falls die Antwort unerwartet ist
+
             raise ValueError(f"Error parsing fan data: {response}") from e
 
         return {
@@ -40,23 +39,22 @@ class CresFan:
 
     async def setAllFanData(self, enabled: bool, dutyCycle: float, dutyCycleMin: float):
         """Set all Fan data with a single request."""
-        # Bereite den Request vor
+
         enabled_val = '1' if enabled else '0'
         
-        # Ein einzelnes Request mit mehreren Kommandos kombinieren
+
         response = await self.req._get_request(
             f"fan:enabled={enabled_val};fan:duty-cycle={dutyCycle};fan:duty-cycle-min={dutyCycleMin}"
         )
 
-        # Optional: Fehlerbehandlung hinzufügen, falls das Setzen der Werte fehlschlägt
+
         if response is None or "error" in response.lower():
             raise ValueError(f"Error setting fan data: {response}")
         
-        # Da es sich um einen Set-Request handelt, sollte hier keine Antwort im Format "enabled;duty_cycle;min_duty_cycle" kommen
-        # Wenn du sicherstellen möchtest, dass die Daten korrekt gesetzt wurden, kannst du danach die neuen Werte abrufen:
+
         await self.updateFanData()
 
-        # Rückgabe der gesetzten Werte
+
         return {
             "enabled": self.enabled,
             "duty_cycle": self.duty_cycle,
@@ -83,23 +81,23 @@ class CresFan:
 
         if response:
             self.enabled = enabled
-            if not self.enabled:  # If fan is disabled, set duty cycle to 0
+            if not self.enabled:  
                 await self.setFanDutyCycle(0)
         return response
 
     async def getFanDutyCycle(self):
-        self.duty_cycle = float(await self.req._get_request("fan:duty-cycle"))  # Konvertiere zu float
+        self.duty_cycle = float(await self.req._get_request("fan:duty-cycle")) 
         return self.duty_cycle
 
-    async def setFanDutyCycle(self, duty_cycle: float):  # Erlaube float als Parameter
-        self.duty_cycle = float(await self.req._get_request(f"fan:duty-cycle={duty_cycle}"))  # Konvertiere zu float
+    async def setFanDutyCycle(self, duty_cycle: float): 
+        self.duty_cycle = float(await self.req._get_request(f"fan:duty-cycle={duty_cycle}")) 
         return self.duty_cycle
 
     async def getFanDutyCycleMin(self):
-        self.min_duty_cycle = float(await self.req._get_request("fan:duty-cycle-min"))  # Konvertiere zu float
+        self.min_duty_cycle = float(await self.req._get_request("fan:duty-cycle-min"))  
         return self.min_duty_cycle
 
-    async def setFanDutyCycleMin(self, min_duty_cycle: float):  # Erlaube float als Parameter
+    async def setFanDutyCycleMin(self, min_duty_cycle: float): 
         await self.req._get_request(f"fan:duty-cycle-min={min_duty_cycle}")
         self.min_duty_cycle = min_duty_cycle
         

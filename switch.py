@@ -10,7 +10,7 @@ async def async_setup_entry(hass, entry, async_add_entities):
     coordinator = hass.data[DOMAIN][entry.entry_id]["coordinator"]
     switches = []
 
-    # Create separate entities for each switch and PWM-enabled switch
+
     for switch_name in ["12v", "24v-a", "24v-b"]:
         device_id = f"{DOMAIN}_{switch_name}_device"
         switches.append(CresSwitchEntity(coordinator, switch_name, entry, device_id))
@@ -18,7 +18,6 @@ async def async_setup_entry(hass, entry, async_add_entities):
             CresSwitchPWMEnabledEntity(coordinator, switch_name, entry, device_id)
         )
 
-    # Setup PWM enabled entities for outputs 'a' and 'b'
     for output_name in ["a", "b", "c", "d", "e", "f"]:
         device_id = f"{DOMAIN}_{output_name}_device"
         if output_name in ["a", "b"]:
@@ -67,7 +66,7 @@ class CresSwitchEntity(CoordinatorEntity, SwitchEntity):
 
     @property
     def is_on(self):
-        # Update to check the actual enabled state
+       
         return (
             self.coordinator.data["switches"]
             .get(self._switch_name, {})
@@ -90,22 +89,22 @@ class CresSwitchEntity(CoordinatorEntity, SwitchEntity):
         await self.coordinator.controller.switches.set_switch_enabled(
             self._switch_name, True
         )
-        await self.coordinator.async_request_refresh()  # Aktualisiert die Daten
-        self.async_write_ha_state()  # Gibt den neuen Status an HA zurück
+        await self.coordinator.async_request_refresh()  
+        self.async_write_ha_state()  
         _LOGGER.debug(f"Switch {self._switch_name} turned on.")
 
     async def async_turn_off(self, **kwargs):
         await self.coordinator.controller.switches.set_switch_enabled(
             self._switch_name, False
         )
-        await self.coordinator.async_request_refresh()  # Aktualisiert die Daten
-        self.async_write_ha_state()  # Gibt den neuen Status an HA zurück
+        await self.coordinator.async_request_refresh()  
+        self.async_write_ha_state()  
         _LOGGER.debug(f"Switch {self._switch_name} turned off.")
 
     async def async_set_value(self, value: float):
         await self.coordinator.controller.switches.set_duty_cycle(self._switch_name, value)
-        await self.coordinator.async_request_refresh()  # Aktualisiert die Daten
-        self.async_write_ha_state()  # Gibt den neuen Status an HA zurück
+        await self.coordinator.async_request_refresh()  
+        self.async_write_ha_state()  
 
 
 class CresSwitchPWMEnabledEntity(CoordinatorEntity, SwitchEntity):
@@ -158,14 +157,14 @@ class CresSwitchPWMEnabledEntity(CoordinatorEntity, SwitchEntity):
     async def async_turn_on(self, **kwargs):
         await self.coordinator.controller.switches.set_pwm_enabled(self._switch_name, True)
         await self.coordinator.controller.switches.set_switch_enabled(self._switch_name, False)
-        await self.coordinator.async_request_refresh()  # Aktualisiert die Daten
-        self.async_write_ha_state()  # Gibt den neuen Status an HA zurück
+        await self.coordinator.async_request_refresh()  
+        self.async_write_ha_state()  
         _LOGGER.debug(f"PWM for switch {self._switch_name} enabled.")
 
     async def async_turn_off(self, **kwargs):
         await self.coordinator.controller.switches.set_pwm_enabled(self._switch_name, False)
-        await self.coordinator.async_request_refresh()  # Aktualisiert die Daten
-        self.async_write_ha_state()  # Gibt den neuen Status an HA zurück
+        await self.coordinator.async_request_refresh()  
+        self.async_write_ha_state()  
         _LOGGER.debug(f"PWM for switch {self._switch_name} disabled.")
 
     async def async_set_value(self, value: float):
@@ -240,9 +239,8 @@ class CresOutputSwitchEntity(CoordinatorEntity, SwitchEntity):
         )
 
     async def async_set_value(self, value: float):
-        # Eventuell möchtest du die Daten hier auch aktualisieren
         await self.coordinator.async_update_single_device(self._device_id)
-        self.async_write_ha_state()  # Zustand der Entität nach der Änderung aktualisieren
+        self.async_write_ha_state() 
 
 
 class CresSwitchPWMEnabledOutputEntity(CoordinatorEntity, SwitchEntity):
@@ -310,6 +308,5 @@ class CresSwitchPWMEnabledOutputEntity(CoordinatorEntity, SwitchEntity):
         _LOGGER.debug(f"PWM for output {self._switch_name} disabled.")
 
     async def async_set_value(self, value: float):
-        # Eventuell möchtest du die Daten hier auch aktualisieren
         await self.coordinator.async_update_single_device(self._device_id)
-        self.async_write_ha_state()  # Zustand der Entität nach der Änderung aktualisieren
+        self.async_write_ha_state()  

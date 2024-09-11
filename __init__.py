@@ -20,24 +20,19 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     host = entry.data["host"]
     control = CresControl(host)
 
-    # Teste die Verbindung direkt während der Einrichtung
     if not await control.test_connection():
         _LOGGER.error(f"Verbindungstest zu {host} fehlgeschlagen.")
         return False
 
-    # Initialisiere den Coordinator
     coordinator = ExampleCoordinator(hass, entry, control)
 
-    # Speichere die Kontrolleinheit und den Coordinator in hass.data
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = {
         "control": control,
         "coordinator": coordinator,
     }
 
-    # Starte die erste Datenaktualisierung
     await coordinator.async_config_entry_first_refresh()
 
-    # Lade die Plattformen, die Teil der Integration sind (Fan, Sensoren, Switches, Inputs, Outputs)
     platforms = ["fan", "sensor", "switch", "number"]
     for platform in platforms:
         hass.async_create_task(

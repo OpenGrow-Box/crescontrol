@@ -20,11 +20,11 @@ async def async_setup_entry(hass, entry, async_add_entities):
 
     _LOGGER.debug(f"Starting setup of sensors. Coordinator data: {coordinator.data}")
 
-    # Loop through all devices and add the appropriate sensors or inputs
+   
     for device in coordinator.controller.devices:
         device_id_normalized = device.device_id.lower()
 
-        # Handle sensor devices (e.g., temperature, humidity, vpd, co2)
+        
         if device.device_type == "sensor":
             _LOGGER.debug(f"Detected sensor device: {device.device_id}")
             for sensor_type in ["temperature", "humidity", "vpd", "co2"]:
@@ -35,7 +35,7 @@ async def async_setup_entry(hass, entry, async_add_entities):
                             device, sensor_type, coordinator, entry
                         )
 
-        # Handle input devices (e.g., voltage)
+       
         elif device.device_type == "input":
             _LOGGER.debug(f"Detected input device: {device.device_id}")
             entity_id = f"{device_id_normalized}_voltage"
@@ -48,7 +48,7 @@ async def async_setup_entry(hass, entry, async_add_entities):
     async_add_entities(sensors.values())
     _LOGGER.debug(f"Sensors added to Home Assistant: {list(sensors.keys())}")
 
-# Sensor Entities for the different sensor types
+
 
 class CresSensorEntity(CoordinatorEntity, SensorEntity):
     def __init__(self, device, sensor_type, coordinator, entry):
@@ -79,7 +79,7 @@ class CresSensorEntity(CoordinatorEntity, SensorEntity):
 
     def _get_state_from_coordinator(self):
         """Fetch the state from the coordinator data."""
-        # Fetch sensor data from the coordinator
+        
         sensor_data = self.coordinator.data.get("sensors", {})
         state = sensor_data.get(self._device.device_id, {}).get(self._sensor_type)
         
@@ -101,7 +101,7 @@ class CresSensorEntity(CoordinatorEntity, SensorEntity):
 
     @property
     def state(self):
-        # Fetch and return state from the coordinator
+        
         return self._get_state_from_coordinator()
 
     @property

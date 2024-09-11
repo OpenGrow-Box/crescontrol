@@ -21,18 +21,18 @@ class CresSwitches:
     ## Multi Device Request
     async def getAllSwitchData(self):
         """Fetch all switch data with a single request."""
-        # Kombinierter Request, um alle Schalter-Daten auf einmal abzurufen
+
         response = await self.req._get_request(
             "switch-12v:enabled;switch-12v:pwm-enabled;switch-12v:duty-cycle;switch-12v:pwm-frequency;"
             "switch-24v-a:enabled;switch-24v-a:pwm-enabled;switch-24v-a:duty-cycle;switch-24v-a:pwm-frequency;"
             "switch-24v-b:enabled;switch-24v-b:pwm-enabled;switch-24v-b:duty-cycle;switch-24v-b:pwm-frequency"
         )
 
-        # Überprüfen, ob die Antwort gültig ist
+
         if response is None or "error" in response.lower():
             raise ValueError(f"Error fetching switch data: {response}")
 
-        # Antwort aufsplitten und die Werte zuweisen
+ 
         try:
             (
                 enabled_12v, enabled_pwm_12v, duty_cycle_12v, pwm_frequency_12v,
@@ -40,31 +40,31 @@ class CresSwitches:
                 enabled_24v_b, enabled_pwm_24v_b, duty_cycle_24v_b, pwm_frequency_24v_b
             ) = response.split(";")
             
-            # Zuweisungen vornehmen für switch 12v
+           
             self.switch_data["12v"]["enabled"] = enabled_12v == "1"
             self.switch_data["12v"]["pwm-enabled"] = enabled_pwm_12v == "1"
             self.switch_data["12v"]["duty-cycle"] = float(duty_cycle_12v)
             self.switch_data["12v"]["pwm-frequency"] = float(pwm_frequency_12v)
 
-            # Zuweisungen vornehmen für switch 24v-a
+           
             self.switch_data["24v-a"]["enabled"] = enabled_24v_a == "1"
             self.switch_data["24v-a"]["pwm-enabled"] = enabled_pwm_24v_a == "1"
             self.switch_data["24v-a"]["duty-cycle"] = float(duty_cycle_24v_a)
             self.switch_data["24v-a"]["pwm-frequency"] = float(pwm_frequency_24v_a)
 
-            # Zuweisungen vornehmen für switch 24v-b
+           
             self.switch_data["24v-b"]["enabled"] = enabled_24v_b == "1"
             self.switch_data["24v-b"]["pwm-enabled"] = enabled_pwm_24v_b == "1"
             self.switch_data["24v-b"]["duty-cycle"] = float(duty_cycle_24v_b)
             self.switch_data["24v-b"]["pwm-frequency"] = float(pwm_frequency_24v_b)
 
         except ValueError as e:
-            # Falls die Antwort unerwartet ist
+            
             raise ValueError(f"Error parsing switch data: {response}") from e
 
         return self.switch_data
 
-    ###  Single Device Requests (Unverändert)
+    ###  Single Device Requests 
     async def get_switch_enabled(self, switch_name):
         response = await self.req._get_request(f"switch-{switch_name}:enabled")
         self.switch_data[switch_name]["enabled"] = str(response).strip() == "1"

@@ -10,11 +10,11 @@ async def async_setup_entry(hass, entry, async_add_entities):
     """Setup fan platform."""
     coordinator = hass.data[DOMAIN][entry.entry_id]["coordinator"]
 
-    # Nur einen Fan hinzufügen, da es nur einen gibt
+   
     fan_entity = CresFanEntity(coordinator, entry.entry_id)
     async_add_entities(
         [fan_entity], True
-    )  # True ensures the entity is updated upon creation
+    ) 
 
     _LOGGER.debug(f"Fan entity {fan_entity.name} added to Home Assistant")
 
@@ -23,7 +23,7 @@ class CresFanEntity(CoordinatorEntity, FanEntity):
     def __init__(self, coordinator, entry_id):
         super().__init__(coordinator)
         self._entry_id = entry_id
-        self._device_id = f"{DOMAIN}_fan_device"  # Unique device identifier
+        self._device_id = f"{DOMAIN}_fan_device" 
 
     @property
     def unique_id(self):
@@ -64,11 +64,10 @@ class CresFanEntity(CoordinatorEntity, FanEntity):
         except (ValueError, TypeError):
             duty_cycle = 0
 
-        # If the fan is not enabled or the duty_cycle is 0, the fan is considered off
+      
         if not enabled:
             return False
 
-        # Fan is considered "on" only if enabled is True and duty_cycle > 0
         return enabled and duty_cycle > 0
 
     @property
@@ -78,7 +77,7 @@ class CresFanEntity(CoordinatorEntity, FanEntity):
         enabled = fan_data.get("enabled", False)
         duty_cycle = fan_data.get("dutyCycle", 0)
 
-        # If the fan is disabled, return 0 for percentage regardless of duty cycle
+
         if enabled == False:
             return 0
 
@@ -109,7 +108,7 @@ class CresFanEntity(CoordinatorEntity, FanEntity):
         """Turn off the fan using the coordinator."""
         _LOGGER.debug("Turning off fan")
 
-        # Set duty cycle to 0 and disable the fan
+        
         await self.coordinator.controller.fan.setFanEnabled(False)
         await self.coordinator.controller.fan.setFanDutyCycle(0)
         await self.coordinator.async_update_single_device("fan")
@@ -119,7 +118,7 @@ class CresFanEntity(CoordinatorEntity, FanEntity):
         """Set the speed percentage of the fan using the coordinator."""
         _LOGGER.debug(f"Setting fan percentage to {percentage}")
 
-        # Always update the duty cycle, but only enable the fan if percentage is greater than 0
+       
         if percentage > 0:
             await self.coordinator.controller.fan.setFanEnabled(True)
         else:
@@ -127,7 +126,7 @@ class CresFanEntity(CoordinatorEntity, FanEntity):
 
         await self.coordinator.controller.fan.setFanDutyCycle(float(percentage))
 
-        # Refresh only the fan data
+      
         await self.coordinator.async_update_single_device("fan")
         self.async_write_ha_state()
 

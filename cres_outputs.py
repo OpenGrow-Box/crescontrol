@@ -30,7 +30,7 @@ class CresOutputs:
 # Multi Deviec Request 
     async def getAllOutputsData(self):
         """Fetch all output data with a single request for all outputs."""
-        # Kombinierter Request, um alle Output-Daten auf einmal abzurufen
+
         request_parts = []
         for output_name in self.outputList:
             request_parts.append(
@@ -41,17 +41,17 @@ class CresOutputs:
                     f"out-{output_name}:pwm-enabled;out-{output_name}:pwm-frequency"
                 )
 
-        # Erzeuge den kombinierten Request-String
+
         request_string = ";".join(request_parts)
 
-        # Sende den kombinierten Request
+
         response = await self.req._get_request(request_string)
 
-        # Überprüfen, ob die Antwort gültig ist
+  
         if response is None or "error" in response.lower():
             raise ValueError(f"Error fetching output data: {response}")
 
-        # Aufteilen der Antworten
+    
         try:
             split_response = response.split(";")
             index = 0
@@ -63,14 +63,14 @@ class CresOutputs:
                 self.outputs_data[output_name]["threshold"] = float(split_response[index + 4])
                 index += 5
                 
-                # Falls PWM vorhanden ist, die zusätzlichen Werte verarbeiten
+                
                 if output_name in self.isPWM:
                     self.outputs_data[output_name]["pwmEnabled"] = str(split_response[index]).strip() == "1"
                     self.outputs_data[output_name]["pwmFrequency"] = float(split_response[index + 1])
                     index += 2
 
         except ValueError as e:
-            # Fehler beim Parsen der Antwort
+           
             raise ValueError(f"Error parsing output data: {response}") from e
 
         return self.outputs_data

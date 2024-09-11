@@ -43,7 +43,7 @@ class CresControl:
 
         # Initialize placeholders for data
         self.system_data = None
-        self.fan_data = {}  # Fan data placeholder
+        self.fan_data = {}  
         self.sensor_data = None
         self.inputs_data = None
         self.outputs_data = None
@@ -51,8 +51,8 @@ class CresControl:
 
     async def init_devices(self):
         # Sensors Initialization
-        await self.sensors.get_sensors()  # Fetch sensor list
-        await self.sensors.update_sensor_data()  # Initialize sensor data
+        await self.sensors.get_sensors()  
+        await self.sensors.update_sensor_data() 
 
         for sensor_id, sensor_state in self.sensors.sensor_data.items():
             self.devices.append(
