@@ -29,32 +29,8 @@
      git clone https://github.com/OpenGrow-Box/crescontrol.git
 
      ```
-     cp -R crescontrol homassitant/custom_components/.
+     cp -R crescontrol path/To/hmassitant/custom_components/.
      ```
 
 4. **Geräte und Automatisierungen konfigurieren**: Nutze Home Assistant, um Automatisierungen basierend auf den Sensorwerten zu erstellen, z.B. das Ein- und Ausschalten von Ventilatoren oder Lampen.
 
-## Beispielkonfiguration 🔧
-
-Ein Beispiel zur Steuerung der Beleuchtung abhängig von der Tageszeit in HA:
-
-
-```yaml
-automation:
-  - alias: "Turn on Grow Lights at 8am"
-    trigger:
-      platform: time
-      at: "08:00:00"
-    action:
-      service: switch.turn_on
-      target:
-        entity_id: switch.grow_lights
-
-  - alias: "Turn off Grow Lights at 8pm"
-    trigger:
-      platform: time
-      at: "20:00:00"
-    action:
-      service: switch.turn_off
-      target:
-        entity_id: switch.grow_lights
