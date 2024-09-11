@@ -1,0 +1,15 @@
+{
+    "version": "1",
+    "domain": "crescontrol",
+    "name": "CresControl-HA",
+    "config_flow": true,
+    "documentation": "https://wiki.opengrowbox.net",
+    "requirements": [],
+    "dependencies": [],
+    "codeowners": ["@OpenGrowBox"],
+    "iot_class": "local_polling",
+    "icon": "icon.png",
+    "logo": "logo.png",
+    "translations": ["translations/en.json", "translations/de.json"]
+  }
+  

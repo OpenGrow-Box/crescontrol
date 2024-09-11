@@ -1,0 +1,16 @@
+{
+    "config": {
+        "step": {
+            "user": {
+                "title": "Mit CresControl verbinden",
+                "description": "Geben Sie die Host-IP-Adresse ein, um eine Verbindung herzustellen.",
+                "data": {
+                    "host": "Host-IP-Adresse"
+                }
+            }
+        },
+        "error": {
+            "cannot_connect": "Verbindung zum Gerät fehlgeschlagen. Bitte überprüfen Sie die IP-Adresse und versuchen Sie es erneut."
+        }
+    }
+}

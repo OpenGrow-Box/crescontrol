@@ -1,0 +1,16 @@
+{
+    "config": {
+        "step": {
+            "user": {
+                "title": "Connect to CresControl",
+                "description": "Please enter the host IP address to connect to your CresControl device.",
+                "data": {
+                    "host": "Host IP address"
+                }
+            }
+        },
+        "error": {
+            "cannot_connect": "Failed to connect to the device. Please check the IP address and try again."
+        }
+    }
+}
