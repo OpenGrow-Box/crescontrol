@@ -27,9 +27,8 @@
    - Klone dieses Repository:
      ```bash
      git clone https://github.com/OpenGrow-Box/crescontrol.git
-
      ```
-     cp -R crescontrol path/To/hmassitant/custom_components/.
+          cp -R crescontrol path/To/hmassitant/custom_components/.
      ```
 
 4. **Geräte und Automatisierungen konfigurieren**: Nutze Home Assistant, um Automatisierungen basierend auf den Sensorwerten zu erstellen, z.B. das Ein- und Ausschalten von Ventilatoren oder Lampen.
