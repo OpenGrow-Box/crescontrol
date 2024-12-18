@@ -8,5 +8,6 @@
     "homeassistant": "2023.1.0",
     "render_readme": true,
     "category": "integration",
-    "repository": "https://github.com/OpenGrow-Box/crescontrol"
+    "repository": "https://github.com/OpenGrow-Box/crescontrol",
+    "issue_tracker": "https://github.com/OpenGrow-Box/crescontrol/issues"
 }
