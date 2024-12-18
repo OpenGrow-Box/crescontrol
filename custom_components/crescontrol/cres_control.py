@@ -1,10 +1,10 @@
 import asyncio
-from .cres_system import CresSystem
-from .cres_sensor import CresSensors
-from .cres_fan import CresFan
-from .cres_inputs import CresInputs
-from .cres_outputs import CresOutputs
-from .cres_switch import CresSwitches
+from custom_components.crescontrol.cres_system import CresSystem
+from custom_components.crescontrol.cres_sensor import CresSensors
+from custom_components.crescontrol.cres_fan import CresFan
+from custom_components.crescontrol.cres_inputs import CresInputs
+from custom_components.crescontrol.cres_outputs import CresOutputs
+from custom_components.crescontrol.cres_switch import CresSwitches
 from dataclasses import dataclass
 from enum import StrEnum
 import logging

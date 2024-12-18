@@ -2,8 +2,8 @@ import voluptuous as vol
 from homeassistant import config_entries
 from homeassistant.const import CONF_HOST
 from homeassistant.core import callback
-from .const import DOMAIN
-from .cres_control import CresControl  # Stellen Sie sicher, dass CresControl importiert wird
+from custom_components.crescontrol.const import DOMAIN
+from custom_components.crescontrol.cres_control import CresControl  # Stellen Sie sicher, dass CresControl importiert wird
 import logging
 
 _LOGGER = logging.getLogger(__name__)

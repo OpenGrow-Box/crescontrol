@@ -5,8 +5,8 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_HOST, CONF_SCAN_INTERVAL
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
-from .cres_control import CresControl, APIAuthError, DeviceType
-from .const import DEFAULT_SCAN_INTERVAL, DOMAIN
+from custom_components.crescontrol.cres_control import CresControl, APIAuthError, DeviceType
+from custom_components.crescontrol.const import DEFAULT_SCAN_INTERVAL, DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
 

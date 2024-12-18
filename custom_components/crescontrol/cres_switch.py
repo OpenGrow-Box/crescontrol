@@ -1,4 +1,4 @@
-from .cres_req import CresRequest
+from custom_components.crescontrol.cres_req import CresRequest
 import logging
 
 _LOGGER = logging.getLogger(__name__)

@@ -1,9 +1,9 @@
 import logging
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
-from .const import DOMAIN
-from .cres_control import CresControl
-from .coordinator import ExampleCoordinator
+from custom_components.crescontrol.const import DOMAIN
+from custom_components.crescontrol.cres_control import CresControl
+from custom_components.crescontrol.coordinator import ExampleCoordinator
 
 _LOGGER = logging.getLogger(__name__)
 

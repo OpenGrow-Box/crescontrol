@@ -1,7 +1,7 @@
 import logging
 from homeassistant.components.fan import FanEntity, FanEntityFeature
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
-from .const import DOMAIN
+from custom_components.crescontrol.const import DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
 
