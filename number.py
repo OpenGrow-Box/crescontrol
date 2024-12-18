@@ -151,7 +151,7 @@ class CresFanMinDutyCycleNumber(CoordinatorEntity, NumberEntity):
         return f"crescontrol_{self._device_name}_min_duty_cycle"
 
     @property
-    def value(self):
+    def native_value(self):
         # Zugreifen auf die neuesten Fan-Daten vom Coordinator
         raw_value = self.coordinator.data["fan"].get("minDutyCycle", 0)
         return raw_value
@@ -170,15 +170,15 @@ class CresFanMinDutyCycleNumber(CoordinatorEntity, NumberEntity):
         }
 
     @property
-    def min_value(self):
+    def native_min_value(self):
         return 0
 
     @property
-    def max_value(self):
+    def native_max_value(self):
         return 100
     
     @property
-    def step(self):
+    def native_step(self):
         return 0.1
     
     @property
@@ -199,7 +199,7 @@ class CresInputCalibOffsetNumber(CresControlNumber):
         return f"crescontrol_input_{self._input_name}_calib_offset"
 
     @property
-    def value(self):
+    def native_value(self):
         raw_value = self.coordinator.controller.inputs.inputs_data[self._input_name][
             "calibOffset"
         ]
@@ -208,15 +208,15 @@ class CresInputCalibOffsetNumber(CresControlNumber):
         )
 
     @property
-    def min_value(self):
+    def native_min_value(self):
         return 0
 
     @property
-    def max_value(self):
+    def native_max_value(self):
         return 10
     
     @property
-    def step(self):
+    def native_step(self):
         return 0.1
 
     @property
@@ -245,7 +245,7 @@ class CresInputCalibFactorNumber(CresControlNumber):
         return f"crescontrol_input_{self._input_name}_calib_factor"
 
     @property
-    def value(self):
+    def native_value(self):
         raw_value = self.coordinator.controller.inputs.inputs_data[self._input_name][
             "calibFactor"
         ]
@@ -254,15 +254,15 @@ class CresInputCalibFactorNumber(CresControlNumber):
         )
 
     @property
-    def min_value(self):
+    def native_min_value(self):
         return 1
 
     @property
-    def max_value(self):
+    def native_max_value(self):
         return 10
     
     @property
-    def step(self):
+    def native_step(self):
         return 0.1
     
     
@@ -292,7 +292,7 @@ class CresOutputVoltageNumber(CresControlNumber):
         return f"crescontrol_output_{self._output_name}_voltage"
 
     @property
-    def value(self):
+    def native_value(self):
         raw_value = self.coordinator.controller.outputs.outputs_data[self._output_name][
             "voltage"
         ]
@@ -301,15 +301,15 @@ class CresOutputVoltageNumber(CresControlNumber):
         )
 
     @property
-    def min_value(self):
+    def native_min_value(self):
         return 0
 
     @property
-    def max_value(self):
+    def native_max_value(self):
         return 10
 
     @property
-    def step(self):
+    def native_step(self):
         return 0.1
 
     @property
@@ -337,7 +337,7 @@ class CresOutputCalibOffsetNumber(CresControlNumber):
         return f"crescontrol_output_{self._output_name}_calib_offset"
 
     @property
-    def value(self):
+    def native_value(self):
         raw_value = self.coordinator.controller.outputs.outputs_data[self._output_name][
             "calibOffset"
         ]
@@ -346,15 +346,15 @@ class CresOutputCalibOffsetNumber(CresControlNumber):
         )
 
     @property
-    def min_value(self):
+    def native_min_value(self):
         return 0
 
     @property
-    def max_value(self):
+    def native_max_value(self):
         return 10
 
     @property
-    def step(self):
+    def native_step(self):
         return 0.1
 
     @property
@@ -388,7 +388,7 @@ class CresOutputCalibFactorNumber(CresControlNumber):
         return f"crescontrol_output_{self._output_name}_calib_factor"
 
     @property
-    def value(self):
+    def native_value(self):
         raw_value = self.coordinator.controller.outputs.outputs_data[
             self._output_name
         ].get("calibFactor", "")
@@ -397,15 +397,15 @@ class CresOutputCalibFactorNumber(CresControlNumber):
         )
 
     @property
-    def min_value(self):
+    def native_min_value(self):
         return 1  
 
     @property
-    def max_value(self):
+    def native_max_value(self):
         return 10  
 
     @property
-    def step(self):
+    def native_step(self):
         return 0.1
 
     @property
@@ -435,7 +435,7 @@ class CresSwitchDutyCycleNumber(CresControlNumber):
         return f"crescontrol_switch_{self._switch_name}_duty_cycle"
 
     @property
-    def value(self):
+    def native_value(self):
         raw_value = self.coordinator.controller.switches.switch_data[
             self._switch_name
         ]["duty-cycle"]
@@ -444,12 +444,16 @@ class CresSwitchDutyCycleNumber(CresControlNumber):
         )
 
     @property
-    def min_value(self):
+    def native_min_value(self):
         return 0
 
     @property
-    def max_value(self):
+    def native_max_value(self):
         return 100
+
+    @property
+    def native_step(self):
+        return 0.1
 
     @property
     def unit_of_measurement(self):
@@ -476,7 +480,7 @@ class CresOutputPWMFrequencyNumber(CresControlNumber):
         return f"crescontrol_output_{self._output_name}_pwm_frequency"
 
     @property
-    def value(self):
+    def native_value(self):
         raw_value = self.coordinator.controller.outputs.outputs_data[
             self._output_name
         ].get("pwmFrequency", 0)
@@ -496,15 +500,15 @@ class CresOutputPWMFrequencyNumber(CresControlNumber):
         return converted_value
 
     @property
-    def min_value(self):
+    def native_min_value(self):
         return 0
 
     @property
-    def max_value(self):
+    def native_max_value(self):
         return 1000
 
     @property
-    def step(self):
+    def native_step(self):
         return 1
 
     @property
@@ -532,7 +536,7 @@ class CresSwitchPWMFrequencyNumber(CresControlNumber):
         return f"crescontrol_switch_{self._switch_name}_pwm_frequency"
 
     @property
-    def value(self):
+    def native_value(self):
         raw_value = self.coordinator.controller.switches.switch_data[
             self._switch_name
         ].get("pwm-frequency", 0)
@@ -552,15 +556,15 @@ class CresSwitchPWMFrequencyNumber(CresControlNumber):
         return converted_value
 
     @property
-    def min_value(self):
+    def native_min_value(self):
         return 0
 
     @property
-    def max_value(self):
+    def native_max_value(self):
         return 1000
     
     @property
-    def step(self):
+    def native_step(self):
         return 1
 
     @property
@@ -588,7 +592,7 @@ class CresSwitchPWMEnabledNumber(CresControlNumber):
         return f"crescontrol_switch_{self._switch_name}_pwm_enabled"
 
     @property
-    def value(self):
+    def native_value(self):
         raw_value = self.coordinator.controller.switches.switch_data[
             self._switch_name
         ].get("pwm-enabled", 0)
@@ -597,12 +601,16 @@ class CresSwitchPWMEnabledNumber(CresControlNumber):
         )
 
     @property
-    def min_value(self):
+    def native_min_value(self):
         return 0
 
     @property
-    def max_value(self):
+    def native_max_value(self):
         return 1
+
+    @property
+    def native_step(self):
+        return 0.1
 
     async def async_set_value(self, value: float):
         pwm_enabled = value > 0.5
@@ -628,7 +636,7 @@ class CresOutputThresholdNumber(CresControlNumber):
         return f"crescontrol_output_{self._output_name}_threshold"
 
     @property
-    def value(self):
+    def native_value(self):
         
         raw_value = self.coordinator.controller.outputs.outputs_data[self._output_name].get(
             "threshold", 0
@@ -638,15 +646,15 @@ class CresOutputThresholdNumber(CresControlNumber):
         )
 
     @property
-    def min_value(self):
+    def native_min_value(self):
         return 0
 
     @property
-    def max_value(self):
+    def native_max_value(self):
         return 100
     
     @property
-    def step(self):
+    def native_step(self):
         return 0.1
 
     @property
