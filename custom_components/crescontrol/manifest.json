@@ -1,9 +1,9 @@
 {
-    "version": "1",
+    "version": "1.0.0",
     "domain": "crescontrol",
     "name": "CresControl-HA",
     "config_flow": true,
-    "documentation": "https://wiki.opengrowbox.net",
+    "documentation": "https://wiki.cre.science/de/crescontrol/command-reference",
     "requirements": [],
     "dependencies": [],
     "codeowners": ["@OpenGrowBox"],

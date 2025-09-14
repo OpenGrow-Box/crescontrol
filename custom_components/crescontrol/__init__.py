@@ -33,11 +33,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     await coordinator.async_config_entry_first_refresh()
 
+    # Korrigiert: Verwende async_forward_entry_setups mit einer Liste
     platforms = ["fan", "sensor", "switch", "number"]
+    await hass.config_entries.async_forward_entry_setups(entry, platforms)
+    
     for platform in platforms:
-        hass.async_create_task(
-            hass.config_entries.async_forward_entry_setup(entry, platform)
-        )
         _LOGGER.debug(f"Plattform {platform} wird geladen")
 
     _LOGGER.debug("CresControl Integration erfolgreich eingerichtet")
