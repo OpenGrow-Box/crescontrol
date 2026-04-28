@@ -103,9 +103,6 @@ class CresFanEntity(CoordinatorEntity, FanEntity):
         except (ValueError, TypeError):
             duty_cycle = 0
 
-        if not enabled:
-            return False
-
         return enabled and duty_cycle > 0
 
     @property

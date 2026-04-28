@@ -92,6 +92,6 @@ class CresSystem:
             # "watermark": await self.getHeapWatermark(),
             # "serialEnabled": await self.getSerialEnabled(),
             # "baudRate": await self.getBaudrate(),
-            "type": await self.getType(),
+            "type": await self.getSystemInfo(),
         }
         return self.system_info

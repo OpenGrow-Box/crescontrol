@@ -17,14 +17,14 @@ class CresFan:
         )
 
        
-        if response is None or "error" in response.lower():
+        if response is None or (isinstance(response, str) and "error" in response.lower()):
             raise ValueError(f"Error fetching fan data: {response}")
 
         
         try:
             enabled, duty_cycle, min_duty_cycle = response.split(";")
 
-            self.enabled = enabled == "1"
+            self.enabled = enabled.strip() == "1"
             self.duty_cycle = float(duty_cycle) 
             self.min_duty_cycle = float(min_duty_cycle)  
         except ValueError as e:
@@ -48,11 +48,11 @@ class CresFan:
         )
 
 
-        if response is None or "error" in response.lower():
+        if response is None or (isinstance(response, str) and "error" in response.lower()):
             raise ValueError(f"Error setting fan data: {response}")
         
 
-        await self.updateFanData()
+        await self.getAllFanData()
 
 
         return {

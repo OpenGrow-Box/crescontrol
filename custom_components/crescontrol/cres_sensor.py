@@ -16,7 +16,8 @@ class CresSensors:
 
         sensor_ids = sensor_data.strip("[]").replace('"', "").split(",") 
 
-        self.sensors = sensor_ids if isinstance(sensor_ids, list) else [sensor_ids]
+        # Strip whitespace and filter out empty strings
+        self.sensors = [sid.strip() for sid in sensor_ids if sid.strip()]
 
         return self.sensors
 

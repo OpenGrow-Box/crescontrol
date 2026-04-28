@@ -4,10 +4,10 @@ import logging
 _LOGGER = logging.getLogger(__name__)
 
 class CresSwitches:
-    def __init__(self, reqAddr, switchList=["12v", "24v-a", "24v-b"], session=None):
+    def __init__(self, reqAddr, switchList=None, session=None):
         self.req = CresRequest(reqAddr, session)
-        self.switchList = switchList
-        self.devices = switchList
+        self.switchList = switchList if switchList is not None else ["12v", "24v-a", "24v-b"]
+        self.devices = self.switchList
         self.switch_data = {}
         
         for switch_name in self.devices:
@@ -21,45 +21,32 @@ class CresSwitches:
     ## Multi Device Request
     async def getAllSwitchData(self):
         """Fetch all switch data with a single request."""
+        if not self.switchList:
+            return self.switch_data
 
-        response = await self.req._get_request(
-            "switch-12v:enabled;switch-12v:pwm-enabled;switch-12v:duty-cycle;switch-12v:pwm-frequency;"
-            "switch-24v-a:enabled;switch-24v-a:pwm-enabled;switch-24v-a:duty-cycle;switch-24v-a:pwm-frequency;"
-            "switch-24v-b:enabled;switch-24v-b:pwm-enabled;switch-24v-b:duty-cycle;switch-24v-b:pwm-frequency"
-        )
+        request_parts = []
+        for switch_name in self.switchList:
+            request_parts.append(
+                f"switch-{switch_name}:enabled;switch-{switch_name}:pwm-enabled;switch-{switch_name}:duty-cycle;switch-{switch_name}:pwm-frequency"
+            )
+        
+        request_string = ";".join(request_parts)
+        response = await self.req._get_request(request_string)
 
-
-        if response is None or "error" in response.lower():
+        if response is None or (isinstance(response, str) and "error" in response.lower()):
             raise ValueError(f"Error fetching switch data: {response}")
 
- 
         try:
-            (
-                enabled_12v, enabled_pwm_12v, duty_cycle_12v, pwm_frequency_12v,
-                enabled_24v_a, enabled_pwm_24v_a, duty_cycle_24v_a, pwm_frequency_24v_a,
-                enabled_24v_b, enabled_pwm_24v_b, duty_cycle_24v_b, pwm_frequency_24v_b
-            ) = response.split(";")
-            
-           
-            self.switch_data["12v"]["enabled"] = enabled_12v == "1"
-            self.switch_data["12v"]["pwm-enabled"] = enabled_pwm_12v == "1"
-            self.switch_data["12v"]["duty-cycle"] = float(duty_cycle_12v)
-            self.switch_data["12v"]["pwm-frequency"] = float(pwm_frequency_12v)
+            split_response = response.split(";")
+            index = 0
+            for switch_name in self.switchList:
+                self.switch_data[switch_name]["enabled"] = split_response[index].strip() == "1"
+                self.switch_data[switch_name]["pwm-enabled"] = split_response[index + 1].strip() == "1"
+                self.switch_data[switch_name]["duty-cycle"] = float(split_response[index + 2])
+                self.switch_data[switch_name]["pwm-frequency"] = float(split_response[index + 3])
+                index += 4
 
-           
-            self.switch_data["24v-a"]["enabled"] = enabled_24v_a == "1"
-            self.switch_data["24v-a"]["pwm-enabled"] = enabled_pwm_24v_a == "1"
-            self.switch_data["24v-a"]["duty-cycle"] = float(duty_cycle_24v_a)
-            self.switch_data["24v-a"]["pwm-frequency"] = float(pwm_frequency_24v_a)
-
-           
-            self.switch_data["24v-b"]["enabled"] = enabled_24v_b == "1"
-            self.switch_data["24v-b"]["pwm-enabled"] = enabled_pwm_24v_b == "1"
-            self.switch_data["24v-b"]["duty-cycle"] = float(duty_cycle_24v_b)
-            self.switch_data["24v-b"]["pwm-frequency"] = float(pwm_frequency_24v_b)
-
-        except ValueError as e:
-            
+        except (ValueError, IndexError) as e:
             raise ValueError(f"Error parsing switch data: {response}") from e
 
         return self.switch_data

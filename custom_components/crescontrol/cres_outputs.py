@@ -7,15 +7,15 @@ class CresOutputs:
     def __init__(
         self,
         reqAddr,
-        outputList=["a", "b", "c", "d", "e", "f"],
-        pwm_devices=["a", "b"],
+        outputList=None,
+        pwm_devices=None,
         session=None,
     ):
         self.req = CresRequest(reqAddr, session)
-        self.outputList = outputList
-        self.devices = outputList
+        self.outputList = outputList if outputList is not None else ["a", "b", "c", "d", "e", "f"]
+        self.devices = self.outputList
         self.outputs_data = {}
-        self.isPWM = pwm_devices
+        self.isPWM = pwm_devices if pwm_devices is not None else ["a", "b"]
         for output_name in self.devices:
             self.outputs_data[output_name] = {
                 "enabled": False,
@@ -29,16 +29,13 @@ class CresOutputs:
 
 # Multi Device Request 
     async def getAllOutputsData(self):
-        """Fetch all output data in batches of 2 to avoid URI too long."""
+        """Fetch all output data in a single request (URL length is validated)."""
         
         if not self.outputList:
             return self.outputs_data
 
-        # Process outputs in batches of 2 to keep URL short
-        batch_size = 2
-        for i in range(0, len(self.outputList), batch_size):
-            batch = self.outputList[i:i + batch_size]
-            await self._fetchOutputBatch(batch)
+        # Fetch all outputs at once - CresRequest validates URL length
+        await self._fetchOutputBatch(self.outputList)
 
         return self.outputs_data
     
@@ -57,7 +54,7 @@ class CresOutputs:
         request_string = ";".join(request_parts)
         response = await self.req._get_request(request_string)
 
-        if response is None or "error" in response.lower():
+        if response is None or (isinstance(response, str) and "error" in response.lower()):
             raise ValueError(f"Error fetching output data: {response}")
 
         try:

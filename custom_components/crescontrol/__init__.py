@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import aiohttp
 from homeassistant.config_entries import ConfigEntry
@@ -40,30 +41,35 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     session = aiohttp.ClientSession()
     control = CresControl(host, config, session)
 
-    if not await control.test_connection():
-        _LOGGER.error(f"Connection test to {host} failed.")
+    try:
+        if not await control.test_connection():
+            _LOGGER.error(f"Connection test to {host} failed.")
+            await control.async_close()
+            return False
+
+        coordinator = ExampleCoordinator(hass, entry, control)
+
+        hass.data.setdefault(DOMAIN, {})[entry.entry_id] = {
+            "control": control,
+            "coordinator": coordinator,
+        }
+
+        await coordinator.async_config_entry_first_refresh()
+
+        # Auto-enable PWM for configured PWM outputs (A, B) on startup
+        outputs = entry.data.get(CONF_OUTPUTS, {})
+        pwm_outputs = ["a", "b"]
+        for output_name, output_cfg in outputs.items():
+            if output_name in pwm_outputs and output_cfg.get("type") != "none":
+                try:
+                    await control.outputs.set_output_pwm_enabled(output_name, True)
+                    _LOGGER.debug(f"Auto-enabled PWM for output {output_name}")
+                except Exception as e:
+                    _LOGGER.warning(f"Failed to auto-enable PWM for output {output_name}: {e}")
+    except asyncio.CancelledError:
+        # Ensure session is closed on cancellation
         await control.async_close()
-        return False
-
-    coordinator = ExampleCoordinator(hass, entry, control)
-
-    hass.data.setdefault(DOMAIN, {})[entry.entry_id] = {
-        "control": control,
-        "coordinator": coordinator,
-    }
-
-    await coordinator.async_config_entry_first_refresh()
-
-    # Auto-enable PWM for configured PWM outputs (A, B) on startup
-    outputs = entry.data.get(CONF_OUTPUTS, {})
-    pwm_outputs = ["a", "b"]
-    for output_name, output_cfg in outputs.items():
-        if output_name in pwm_outputs and output_cfg.get("type") != "none":
-            try:
-                await control.outputs.set_output_pwm_enabled(output_name, True)
-                _LOGGER.debug(f"Auto-enabled PWM for output {output_name}")
-            except Exception as e:
-                _LOGGER.warning(f"Failed to auto-enable PWM for output {output_name}: {e}")
+        raise
 
     # Determine which platforms to load based on configuration
     platforms = set()
@@ -74,7 +80,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     fan = entry.data.get(CONF_FAN, {})
     
     # Check if this is an old config entry (backward compatibility)
-    is_old_config = not (outputs or switches or inputs or fan)
+    # Old entries don't have the new config keys at all
+    is_old_config = not any(
+        key in entry.data for key in [CONF_OUTPUTS, CONF_SWITCHES, CONF_INPUTS, CONF_FAN]
+    )
     
     if is_old_config:
         _LOGGER.warning("Old config format detected - loading all platforms for backward compatibility. Please reconfigure the integration.")

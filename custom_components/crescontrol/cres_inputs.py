@@ -2,11 +2,11 @@ from custom_components.crescontrol.cres_req import CresRequest
 
 
 class CresInputs:
-    def __init__(self, reqAddr, inputList=["a", "b"], session=None):
+    def __init__(self, reqAddr, inputList=None, session=None):
         self.req = CresRequest(reqAddr, session)
-        self.inputList = inputList
+        self.inputList = inputList if inputList is not None else ["a", "b"]
         self.inputs_data = {}
-        self.devices = ["a", "b"]
+        self.devices = self.inputList
 
         for input_name in self.inputList:
             self.inputs_data[input_name] = {
@@ -19,7 +19,7 @@ class CresInputs:
 
         self.inputList = inputList
         for input_name in self.inputList:
-            self.inputs_data[input_name] = {+                      
+            self.inputs_data[input_name] = {
                 "voltage": 0,
                 "calibOffset": 0,
                 "calibFactor": 0,
@@ -35,7 +35,7 @@ class CresInputs:
 
         response = await self.req._get_request(request_string)
 
-        if response is None or "error" in response.lower():
+        if response is None or (isinstance(response, str) and "error" in response.lower()):
             raise ValueError(f"Error fetching input data: {response}")
 
 
@@ -108,14 +108,14 @@ class CresInputs:
                 f"in-{input_name}:voltage;in-{input_name}:calib-offset;in-{input_name}:calib-factor"
             )
 
-
-            voltage, calibOffset, calibFactor = response.split(";")
-
-
-            self.inputs_data[input_name] = {
-                "voltage": float(voltage),
-                "calibOffset": float(calibOffset),
-                "calibFactor": float(calibFactor),
-            }
+            try:
+                voltage, calibOffset, calibFactor = response.split(";")
+                self.inputs_data[input_name] = {
+                    "voltage": float(voltage),
+                    "calibOffset": float(calibOffset),
+                    "calibFactor": float(calibFactor),
+                }
+            except (ValueError, IndexError) as e:
+                raise ValueError(f"Error parsing input data for {input_name}: {response}") from e
 
         return self.inputs_data

@@ -5,6 +5,10 @@ from typing import Optional
 
 _LOGGER = logging.getLogger(__name__)
 
+# Global lock shared across all CresRequest instances to serialize
+# HTTP requests to the embedded device
+_GLOBAL_REQUEST_LOCK = asyncio.Lock()
+
 # Maximum URL length to prevent 414 errors
 MAX_URL_LENGTH = 1800
 # Request timeout in seconds
@@ -45,7 +49,6 @@ class CresRequest:
         self._timeout = aiohttp.ClientTimeout(total=REQUEST_TIMEOUT)
         self._session: Optional[aiohttp.ClientSession] = session
         self._owns_session = session is None
-        self._lock = asyncio.Lock()
         self._last_request_time = 0
 
     async def _get_session(self) -> aiohttp.ClientSession:
@@ -82,7 +85,9 @@ class CresRequest:
         _LOGGER.debug(f"GET Request URL: {url}")
 
         # Rate limiting - ensure minimum delay between requests
-        async with self._lock:
+        # Global lock protects the entire request lifecycle to prevent concurrent requests
+        # across all subsystems talking to the same embedded device
+        async with _GLOBAL_REQUEST_LOCK:
             current_time = asyncio.get_event_loop().time()
             time_since_last = current_time - self._last_request_time
             if time_since_last < REQUEST_DELAY:
@@ -91,64 +96,64 @@ class CresRequest:
                 await asyncio.sleep(wait)
             self._last_request_time = asyncio.get_event_loop().time()
 
-        last_error = None
-        
-        for attempt in range(1, MAX_RETRIES + 1):
-            try:
-                session = await self._get_session()
-                async with session.get(url) as response:
-                    if response.status == 200:
-                        content_type = response.headers.get("Content-Type", "")
-                        
-                        if "application/json" in content_type:
-                            result = await response.json()
-                            _LOGGER.debug(f"GET Response (JSON): {result}")
-                            return result
-                        elif "text/plain" in content_type:
-                            content = await response.text()
-                            _LOGGER.debug(f"GET Response (text/plain): {content}")
-                            return content
-                        else:
-                            content = await response.text()
-                            _LOGGER.warning(
-                                f"Unexpected content type '{content_type}', returning raw text"
-                            )
-                            return content
-                    
-                    elif response.status == 414:
-                        raise CresRequestURITooLong(
-                            f"URI Too Long ({len(url)} chars). Split your request into smaller batches."
-                        )
-                    else:
-                        response.raise_for_status()
-                        
-            except CresRequestURITooLong:
-                # Don't retry URI too long errors
-                raise
-            except asyncio.TimeoutError as e:
-                last_error = CresRequestTimeout(f"Request timeout (attempt {attempt}/{MAX_RETRIES})")
-                _LOGGER.warning(f"Request timeout (attempt {attempt}/{MAX_RETRIES}): {url}")
-            except aiohttp.ClientConnectionError as e:
-                last_error = CresRequestConnectionError(f"Connection error (attempt {attempt}/{MAX_RETRIES}): {e}")
-                _LOGGER.warning(f"Connection error (attempt {attempt}/{MAX_RETRIES}): {e}")
-                # Close session on connection error to force new connection next time
-                await self.close()
-            except aiohttp.ClientResponseError as e:
-                last_error = CresRequestError(f"HTTP {e.status}: {e.message} (attempt {attempt}/{MAX_RETRIES})")
-                _LOGGER.warning(f"HTTP error {e.status} (attempt {attempt}/{MAX_RETRIES}): {url}")
-            except Exception as e:
-                last_error = CresRequestError(f"Unexpected error (attempt {attempt}/{MAX_RETRIES}): {e}")
-                _LOGGER.warning(f"Unexpected error (attempt {attempt}/{MAX_RETRIES}): {e}")
+            last_error = None
             
-            # Wait before retry (except on last attempt)
-            if attempt < MAX_RETRIES:
-                wait_time = RETRY_DELAY * attempt  # Progressive backoff
-                _LOGGER.debug(f"Waiting {wait_time}s before retry...")
-                await asyncio.sleep(wait_time)
-        
-        # All retries exhausted
-        _LOGGER.error(f"All {MAX_RETRIES} attempts failed for: {url}")
-        raise last_error
+            for attempt in range(1, MAX_RETRIES + 1):
+                try:
+                    session = await self._get_session()
+                    async with session.get(url) as response:
+                        if response.status == 200:
+                            content_type = response.headers.get("Content-Type", "")
+                            
+                            if "application/json" in content_type:
+                                result = await response.json()
+                                _LOGGER.debug(f"GET Response (JSON): {result}")
+                                return result
+                            elif "text/plain" in content_type:
+                                content = await response.text()
+                                _LOGGER.debug(f"GET Response (text/plain): {content}")
+                                return content
+                            else:
+                                content = await response.text()
+                                _LOGGER.warning(
+                                    f"Unexpected content type '{content_type}', returning raw text"
+                                )
+                                return content
+                        
+                        elif response.status == 414:
+                            raise CresRequestURITooLong(
+                                f"URI Too Long ({len(url)} chars). Split your request into smaller batches."
+                            )
+                        else:
+                            response.raise_for_status()
+                            
+                except CresRequestURITooLong:
+                    # Don't retry URI too long errors
+                    raise
+                except asyncio.TimeoutError as e:
+                    last_error = CresRequestTimeout(f"Request timeout (attempt {attempt}/{MAX_RETRIES})")
+                    _LOGGER.warning(f"Request timeout (attempt {attempt}/{MAX_RETRIES}): {url}")
+                except aiohttp.ClientConnectionError as e:
+                    last_error = CresRequestConnectionError(f"Connection error (attempt {attempt}/{MAX_RETRIES}): {e}")
+                    _LOGGER.warning(f"Connection error (attempt {attempt}/{MAX_RETRIES}): {e}")
+                    # Close session on connection error to force new connection next time
+                    await self.close()
+                except aiohttp.ClientResponseError as e:
+                    last_error = CresRequestError(f"HTTP {e.status}: {e.message} (attempt {attempt}/{MAX_RETRIES})")
+                    _LOGGER.warning(f"HTTP error {e.status} (attempt {attempt}/{MAX_RETRIES}): {url}")
+                except Exception as e:
+                    last_error = CresRequestError(f"Unexpected error (attempt {attempt}/{MAX_RETRIES}): {e}")
+                    _LOGGER.warning(f"Unexpected error (attempt {attempt}/{MAX_RETRIES}): {e}")
+                
+                # Wait before retry (except on last attempt)
+                if attempt < MAX_RETRIES:
+                    wait_time = RETRY_DELAY * attempt  # Progressive backoff
+                    _LOGGER.debug(f"Waiting {wait_time}s before retry...")
+                    await asyncio.sleep(wait_time)
+            
+            # All retries exhausted
+            _LOGGER.error(f"All {MAX_RETRIES} attempts failed for: {url}")
+            raise last_error
 
     async def __aenter__(self):
         """Async context manager entry."""

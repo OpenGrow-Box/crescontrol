@@ -33,7 +33,7 @@ class ExampleCoordinator(DataUpdateCoordinator):
             _LOGGER.debug("Updating CresControl data from API")
 
             # Initialize devices only if they haven't been initialized
-            if not self.controller.devices:
+            if not self.controller._initialized:
                 await self.controller.init_devices()
 
             # Update all devices with consolidated requests
