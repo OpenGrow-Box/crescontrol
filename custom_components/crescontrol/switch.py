@@ -61,6 +61,7 @@ class CresOutputSwitchEntity(CoordinatorEntity, SwitchEntity):
         self._entry = entry
         self._device_id = device_id
         self._custom_name = custom_name or f"Output{output_name.upper()}"
+        self._attr_is_on = None
 
     @property
     def available(self) -> bool:
@@ -92,12 +93,21 @@ class CresOutputSwitchEntity(CoordinatorEntity, SwitchEntity):
             "pwm_frequency": outputs_data.get(self._output_name, {}).get("pwmFrequency", 0),
         }
 
+    def _update_from_coordinator(self):
+        """Update local state from coordinator data."""
+        if not self.coordinator.data:
+            return
+        outputs_data = self.coordinator.data.get("outputs", {})
+        self._attr_is_on = outputs_data.get(self._output_name, {}).get("enabled", False)
+
     @property
     def is_on(self):
+        if self._attr_is_on is not None:
+            return self._attr_is_on
         if not self.coordinator.data:
             return False
-        outputs_data = self.coordinator.data.get("outputs", {})
-        return outputs_data.get(self._output_name, {}).get("enabled", False)
+        self._update_from_coordinator()
+        return self._attr_is_on if self._attr_is_on is not None else False
 
     @property
     def icon(self):
@@ -112,7 +122,7 @@ class CresOutputSwitchEntity(CoordinatorEntity, SwitchEntity):
         await self.coordinator.controller.outputs.set_output_enabled(
             self._output_name, True
         )
-        # Update state directly without full refresh
+        self._attr_is_on = True
         self.async_write_ha_state()
         outputs_data = self.coordinator.data.get("outputs", {}) if self.coordinator.data else {}
         _LOGGER.debug(f"Turned on output {self._output_name}, current data: {outputs_data.get(self._output_name)}")
@@ -121,7 +131,7 @@ class CresOutputSwitchEntity(CoordinatorEntity, SwitchEntity):
         await self.coordinator.controller.outputs.set_output_enabled(
             self._output_name, False
         )
-        # Update state directly without full refresh
+        self._attr_is_on = False
         self.async_write_ha_state()
         outputs_data = self.coordinator.data.get("outputs", {}) if self.coordinator.data else {}
         _LOGGER.debug(f"Turned off output {self._output_name}, current data: {outputs_data.get(self._output_name)}")
@@ -136,6 +146,7 @@ class CresOutputPWMEnabledEntity(CoordinatorEntity, SwitchEntity):
         self._entry = entry
         self._device_id = device_id
         self._custom_name = custom_name or f"Output{output_name.upper()}"
+        self._attr_is_on = None
 
     @property
     def available(self) -> bool:
@@ -169,12 +180,21 @@ class CresOutputPWMEnabledEntity(CoordinatorEntity, SwitchEntity):
             "voltage": output_info.get("voltage", 0),
         }
 
+    def _update_from_coordinator(self):
+        """Update local state from coordinator data."""
+        if not self.coordinator.data:
+            return
+        outputs_data = self.coordinator.data.get("outputs", {})
+        self._attr_is_on = outputs_data.get(self._output_name, {}).get("pwmEnabled", False)
+
     @property
     def is_on(self):
+        if self._attr_is_on is not None:
+            return self._attr_is_on
         if not self.coordinator.data:
             return False
-        outputs_data = self.coordinator.data.get("outputs", {})
-        return outputs_data.get(self._output_name, {}).get("pwmEnabled", False)
+        self._update_from_coordinator()
+        return self._attr_is_on if self._attr_is_on is not None else False
 
     @property
     def icon(self):
@@ -184,12 +204,14 @@ class CresOutputPWMEnabledEntity(CoordinatorEntity, SwitchEntity):
         await self.coordinator.controller.outputs.set_output_pwm_enabled(
             self._output_name, True
         )
+        self._attr_is_on = True
         self.async_write_ha_state()
 
     async def async_turn_off(self, **kwargs):
         await self.coordinator.controller.outputs.set_output_pwm_enabled(
             self._output_name, False
         )
+        self._attr_is_on = False
         self.async_write_ha_state()
 
 
@@ -202,6 +224,7 @@ class CresSwitchEntity(CoordinatorEntity, SwitchEntity):
         self._entry = entry
         self._device_id = device_id
         self._custom_name = custom_name or f"Switch{switch_name.upper()}"
+        self._attr_is_on = None
 
     @property
     def available(self) -> bool:
@@ -233,12 +256,21 @@ class CresSwitchEntity(CoordinatorEntity, SwitchEntity):
             "pwm_frequency": switches_data.get(self._switch_name, {}).get("pwm-frequency", 0),
         }
 
+    def _update_from_coordinator(self):
+        """Update local state from coordinator data."""
+        if not self.coordinator.data:
+            return
+        switches_data = self.coordinator.data.get("switches", {})
+        self._attr_is_on = switches_data.get(self._switch_name, {}).get("enabled", False)
+
     @property
     def is_on(self):
+        if self._attr_is_on is not None:
+            return self._attr_is_on
         if not self.coordinator.data:
             return False
-        switches_data = self.coordinator.data.get("switches", {})
-        return switches_data.get(self._switch_name, {}).get("enabled", False)
+        self._update_from_coordinator()
+        return self._attr_is_on if self._attr_is_on is not None else False
 
     @property
     def icon(self):
@@ -248,14 +280,14 @@ class CresSwitchEntity(CoordinatorEntity, SwitchEntity):
         await self.coordinator.controller.switches.set_switch_enabled(
             self._switch_name, True
         )
-        # Update state directly without full refresh
+        self._attr_is_on = True
         self.async_write_ha_state()
 
     async def async_turn_off(self, **kwargs):
         await self.coordinator.controller.switches.set_switch_enabled(
             self._switch_name, False
         )
-        # Update state directly without full refresh
+        self._attr_is_on = False
         self.async_write_ha_state()
 
 
@@ -268,6 +300,7 @@ class CresSwitchPWMEnabledEntity(CoordinatorEntity, SwitchEntity):
         self._entry = entry
         self._device_id = device_id
         self._custom_name = custom_name or f"Switch{switch_name.upper()}"
+        self._attr_is_on = None
 
     @property
     def available(self) -> bool:
@@ -299,12 +332,21 @@ class CresSwitchPWMEnabledEntity(CoordinatorEntity, SwitchEntity):
             "switch_channel": self._switch_name,
         }
 
+    def _update_from_coordinator(self):
+        """Update local state from coordinator data."""
+        if not self.coordinator.data:
+            return
+        switches_data = self.coordinator.data.get("switches", {})
+        self._attr_is_on = switches_data.get(self._switch_name, {}).get("pwm-enabled", False)
+
     @property
     def is_on(self):
+        if self._attr_is_on is not None:
+            return self._attr_is_on
         if not self.coordinator.data:
             return False
-        switches_data = self.coordinator.data.get("switches", {})
-        return switches_data.get(self._switch_name, {}).get("pwm-enabled", False)
+        self._update_from_coordinator()
+        return self._attr_is_on if self._attr_is_on is not None else False
 
     @property
     def icon(self):
@@ -314,10 +356,12 @@ class CresSwitchPWMEnabledEntity(CoordinatorEntity, SwitchEntity):
         await self.coordinator.controller.switches.set_pwm_enabled(
             self._switch_name, True
         )
+        self._attr_is_on = True
         self.async_write_ha_state()
 
     async def async_turn_off(self, **kwargs):
         await self.coordinator.controller.switches.set_pwm_enabled(
             self._switch_name, False
         )
+        self._attr_is_on = False
         self.async_write_ha_state()

@@ -141,6 +141,18 @@ class CresOutputManualNumber(CoordinatorEntity, NumberEntity):
         self._entry = entry
         self._configured_name = configured_name or f"Output{output_name.upper()}"
         self._device_id = f"{DOMAIN}_output_{output_name}_device"
+        self._attr_native_value = None
+
+    def _update_from_coordinator(self):
+        if not self.coordinator.data:
+            self._attr_native_value = 0
+            return
+        output_data = self.coordinator.data.get("outputs", {}).get(self._output_name, {})
+        voltage = output_data.get("voltage", 0)
+        try:
+            self._attr_native_value = float(voltage)
+        except (ValueError, TypeError):
+            self._attr_native_value = 0
 
     @property
     def available(self) -> bool:
@@ -166,14 +178,10 @@ class CresOutputManualNumber(CoordinatorEntity, NumberEntity):
 
     @property
     def native_value(self):
-        if not self.coordinator.data:
-            return 0
-        output_data = self.coordinator.data.get("outputs", {}).get(self._output_name, {})
-        voltage = output_data.get("voltage", 0)
-        try:
-            return float(voltage)
-        except (ValueError, TypeError):
-            return 0
+        if self._attr_native_value is not None:
+            return self._attr_native_value
+        self._update_from_coordinator()
+        return self._attr_native_value
 
     @property
     def native_min_value(self):
@@ -193,6 +201,8 @@ class CresOutputManualNumber(CoordinatorEntity, NumberEntity):
 
     async def async_set_native_value(self, value: float):
         _LOGGER.debug(f"Setting output {self._output_name} manual voltage to {value}")
+        self._attr_native_value = value
+        self.async_write_ha_state()
         await self.coordinator.controller.outputs.set_output_voltage(
             self._output_name, value
         )
@@ -201,7 +211,6 @@ class CresOutputManualNumber(CoordinatorEntity, NumberEntity):
             await self.coordinator.controller.outputs.set_output_pwm_enabled(
                 self._output_name, True
             )
-        self.async_write_ha_state()
 
 
 class CresSwitchManualNumber(CoordinatorEntity, NumberEntity):
@@ -213,6 +222,18 @@ class CresSwitchManualNumber(CoordinatorEntity, NumberEntity):
         self._entry = entry
         self._configured_name = configured_name or f"Switch{switch_name.upper()}"
         self._device_id = f"{DOMAIN}_{switch_name}_device"
+        self._attr_native_value = None
+
+    def _update_from_coordinator(self):
+        if not self.coordinator.data:
+            self._attr_native_value = 0
+            return
+        switch_data = self.coordinator.data.get("switches", {}).get(self._switch_name, {})
+        duty_cycle = switch_data.get("duty-cycle", 0)
+        try:
+            self._attr_native_value = float(duty_cycle)
+        except (ValueError, TypeError):
+            self._attr_native_value = 0
 
     @property
     def available(self) -> bool:
@@ -238,14 +259,10 @@ class CresSwitchManualNumber(CoordinatorEntity, NumberEntity):
 
     @property
     def native_value(self):
-        if not self.coordinator.data:
-            return 0
-        switch_data = self.coordinator.data.get("switches", {}).get(self._switch_name, {})
-        duty_cycle = switch_data.get("duty-cycle", 0)
-        try:
-            return float(duty_cycle)
-        except (ValueError, TypeError):
-            return 0
+        if self._attr_native_value is not None:
+            return self._attr_native_value
+        self._update_from_coordinator()
+        return self._attr_native_value
 
     @property
     def native_min_value(self):
@@ -265,10 +282,11 @@ class CresSwitchManualNumber(CoordinatorEntity, NumberEntity):
 
     async def async_set_native_value(self, value: float):
         _LOGGER.debug(f"Setting switch {self._switch_name} manual duty cycle to {value}")
+        self._attr_native_value = value
+        self.async_write_ha_state()
         await self.coordinator.controller.switches.set_duty_cycle(
             self._switch_name, value
         )
-        self.async_write_ha_state()
 
 
 class CresFanMinDutyCycleNumber(CoordinatorEntity, NumberEntity):
@@ -277,15 +295,18 @@ class CresFanMinDutyCycleNumber(CoordinatorEntity, NumberEntity):
         self._device_name = device_name
         self._entry = entry
         self._configured_name = configured_name or "Ventilation"
+        self._attr_native_value = None
+
+    def _update_from_coordinator(self):
+        if not self.coordinator.data:
+            self._attr_native_value = 0
+            return
+        fan_data = self.coordinator.data.get("fan", {})
+        self._attr_native_value = fan_data.get("minDutyCycle", 0)
 
     @property
     def available(self) -> bool:
         return self.coordinator.last_update_success and self.coordinator.data is not None
-
-    async def async_set_native_value(self, value: float):
-        _LOGGER.debug(f"Setting fan {self._device_name} min duty cycle to {value}")
-        await self.coordinator.controller.fan.setFanDutyCycleMin(value)
-        self.async_write_ha_state()
 
     @property
     def name(self):
@@ -297,10 +318,10 @@ class CresFanMinDutyCycleNumber(CoordinatorEntity, NumberEntity):
 
     @property
     def native_value(self):
-        if not self.coordinator.data:
-            return 0
-        fan_data = self.coordinator.data.get("fan", {})
-        return fan_data.get("minDutyCycle", 0)
+        if self._attr_native_value is not None:
+            return self._attr_native_value
+        self._update_from_coordinator()
+        return self._attr_native_value
 
     @property
     def device_info(self):
@@ -329,6 +350,12 @@ class CresFanMinDutyCycleNumber(CoordinatorEntity, NumberEntity):
     def native_unit_of_measurement(self):
         return "%"
 
+    async def async_set_native_value(self, value: float):
+        _LOGGER.debug(f"Setting fan {self._device_name} min duty cycle to {value}")
+        self._attr_native_value = value
+        self.async_write_ha_state()
+        await self.coordinator.controller.fan.setFanDutyCycleMin(value)
+
 
 class CresInputCalibOffsetNumber(CoordinatorEntity, NumberEntity):
     def __init__(self, coordinator, input_name, entry, configured_name=None):
@@ -337,6 +364,15 @@ class CresInputCalibOffsetNumber(CoordinatorEntity, NumberEntity):
         self._entry = entry
         self._configured_name = configured_name or f"Input{input_name.upper()}"
         self._device_id = f"{DOMAIN}_input_{input_name}"
+        self._attr_native_value = None
+
+    def _update_from_coordinator(self):
+        if not self.coordinator.data:
+            self._attr_native_value = 0
+            return
+        input_data = self.coordinator.data.get("inputs", {}).get(self._input_name, {})
+        raw_value = input_data.get("calibOffset", 0)
+        self._attr_native_value = safe_float_conversion(raw_value, f"Input {self._input_name}", "Calib-Offset")
 
     @property
     def available(self) -> bool:
@@ -352,11 +388,10 @@ class CresInputCalibOffsetNumber(CoordinatorEntity, NumberEntity):
 
     @property
     def native_value(self):
-        if not self.coordinator.data:
-            return 0
-        input_data = self.coordinator.data.get("inputs", {}).get(self._input_name, {})
-        raw_value = input_data.get("calibOffset", 0)
-        return safe_float_conversion(raw_value, f"Input {self._input_name}", "Calib-Offset")
+        if self._attr_native_value is not None:
+            return self._attr_native_value
+        self._update_from_coordinator()
+        return self._attr_native_value
 
     @property
     def native_min_value(self):
@@ -386,11 +421,11 @@ class CresInputCalibOffsetNumber(CoordinatorEntity, NumberEntity):
 
     async def async_set_native_value(self, value: float):
         _LOGGER.debug(f"Setting input {self._input_name} calibration offset to {value}")
+        self._attr_native_value = value
+        self.async_write_ha_state()
         await self.coordinator.controller.inputs.set_input_calib_offset(
             self._input_name, value
         )
-        # Update state directly without full refresh
-        self.async_write_ha_state()
 
 
 class CresInputCalibFactorNumber(CoordinatorEntity, NumberEntity):
@@ -400,6 +435,15 @@ class CresInputCalibFactorNumber(CoordinatorEntity, NumberEntity):
         self._entry = entry
         self._configured_name = configured_name or f"Input{input_name.upper()}"
         self._device_id = f"{DOMAIN}_input_{input_name}"
+        self._attr_native_value = None
+
+    def _update_from_coordinator(self):
+        if not self.coordinator.data:
+            self._attr_native_value = 1
+            return
+        input_data = self.coordinator.data.get("inputs", {}).get(self._input_name, {})
+        raw_value = input_data.get("calibFactor", 1)
+        self._attr_native_value = safe_float_conversion(raw_value, f"Input {self._input_name}", "Calib-Factor")
 
     @property
     def available(self) -> bool:
@@ -415,11 +459,10 @@ class CresInputCalibFactorNumber(CoordinatorEntity, NumberEntity):
 
     @property
     def native_value(self):
-        if not self.coordinator.data:
-            return 1
-        input_data = self.coordinator.data.get("inputs", {}).get(self._input_name, {})
-        raw_value = input_data.get("calibFactor", 1)
-        return safe_float_conversion(raw_value, f"Input {self._input_name}", "Calib-Factor")
+        if self._attr_native_value is not None:
+            return self._attr_native_value
+        self._update_from_coordinator()
+        return self._attr_native_value
 
     @property
     def native_min_value(self):
@@ -449,11 +492,11 @@ class CresInputCalibFactorNumber(CoordinatorEntity, NumberEntity):
 
     async def async_set_native_value(self, value: float):
         _LOGGER.debug(f"Setting input {self._input_name} calibration factor to {value}")
+        self._attr_native_value = value
+        self.async_write_ha_state()
         await self.coordinator.controller.inputs.set_input_calib_factor(
             self._input_name, value
         )
-        # Update state directly without full refresh
-        self.async_write_ha_state()
 
 
 class CresOutputVoltageNumber(CoordinatorEntity, NumberEntity):
@@ -466,6 +509,20 @@ class CresOutputVoltageNumber(CoordinatorEntity, NumberEntity):
         self._device_id = f"{DOMAIN}_output_{output_name}_device"
         # Check if this is a percentage-based control (light/fan) or voltage-based (switch)
         self._is_percentage = entity_type in ["light", "fan"]
+        self._attr_native_value = None
+
+    def _update_from_coordinator(self):
+        if not self.coordinator.data:
+            self._attr_native_value = 0
+            return
+        output_data = self.coordinator.data.get("outputs", {}).get(self._output_name, {})
+        raw_value = output_data.get("voltage", 0)
+        voltage = safe_float_conversion(raw_value, f"Output {self._output_name}", "Voltage")
+        # Convert voltage to percentage for light/fan
+        if self._is_percentage:
+            self._attr_native_value = min(100, max(0, voltage * 10))
+        else:
+            self._attr_native_value = voltage
 
     @property
     def available(self) -> bool:
@@ -482,15 +539,10 @@ class CresOutputVoltageNumber(CoordinatorEntity, NumberEntity):
 
     @property
     def native_value(self):
-        if not self.coordinator.data:
-            return 0
-        output_data = self.coordinator.data.get("outputs", {}).get(self._output_name, {})
-        raw_value = output_data.get("voltage", 0)
-        voltage = safe_float_conversion(raw_value, f"Output {self._output_name}", "Voltage")
-        # Convert voltage to percentage for light/fan
-        if self._is_percentage:
-            return min(100, max(0, voltage * 10))
-        return voltage
+        if self._attr_native_value is not None:
+            return self._attr_native_value
+        self._update_from_coordinator()
+        return self._attr_native_value
 
     @property
     def native_min_value(self):
@@ -527,11 +579,11 @@ class CresOutputVoltageNumber(CoordinatorEntity, NumberEntity):
             voltage = value
             _LOGGER.debug(f"Setting output {self._output_name} voltage to {voltage}V")
         
+        self._attr_native_value = value
+        self.async_write_ha_state()
         await self.coordinator.controller.outputs.set_output_voltage(
             self._output_name, voltage
         )
-        # Update state directly without full refresh
-        self.async_write_ha_state()
 
 
 class CresOutputCalibOffsetNumber(CoordinatorEntity, NumberEntity):
@@ -541,6 +593,15 @@ class CresOutputCalibOffsetNumber(CoordinatorEntity, NumberEntity):
         self._entry = entry
         self._configured_name = configured_name or f"Output{output_name.upper()}"
         self._device_id = f"{DOMAIN}_output_{output_name}_device"
+        self._attr_native_value = None
+
+    def _update_from_coordinator(self):
+        if not self.coordinator.data:
+            self._attr_native_value = 0
+            return
+        output_data = self.coordinator.data.get("outputs", {}).get(self._output_name, {})
+        raw_value = output_data.get("calibOffset", 0)
+        self._attr_native_value = safe_float_conversion(raw_value, f"Output {self._output_name}", "Calib-Offset")
 
     @property
     def available(self) -> bool:
@@ -556,11 +617,10 @@ class CresOutputCalibOffsetNumber(CoordinatorEntity, NumberEntity):
 
     @property
     def native_value(self):
-        if not self.coordinator.data:
-            return 0
-        output_data = self.coordinator.data.get("outputs", {}).get(self._output_name, {})
-        raw_value = output_data.get("calibOffset", 0)
-        return safe_float_conversion(raw_value, f"Output {self._output_name}", "Calib-Offset")
+        if self._attr_native_value is not None:
+            return self._attr_native_value
+        self._update_from_coordinator()
+        return self._attr_native_value
 
     @property
     def native_min_value(self):
@@ -590,10 +650,11 @@ class CresOutputCalibOffsetNumber(CoordinatorEntity, NumberEntity):
 
     async def async_set_native_value(self, value: float):
         _LOGGER.debug(f"Setting output {self._output_name} calibration offset to {value}")
+        self._attr_native_value = value
+        self.async_write_ha_state()
         await self.coordinator.controller.outputs.set_output_calib_offset(
             self._output_name, value
         )
-        self.async_write_ha_state()
 
 
 class CresOutputCalibFactorNumber(CoordinatorEntity, NumberEntity):
@@ -603,6 +664,15 @@ class CresOutputCalibFactorNumber(CoordinatorEntity, NumberEntity):
         self._entry = entry
         self._configured_name = configured_name or f"Output{output_name.upper()}"
         self._device_id = f"{DOMAIN}_output_{output_name}_device"
+        self._attr_native_value = None
+
+    def _update_from_coordinator(self):
+        if not self.coordinator.data:
+            self._attr_native_value = 1
+            return
+        output_data = self.coordinator.data.get("outputs", {}).get(self._output_name, {})
+        raw_value = output_data.get("calibFactor", 1)
+        self._attr_native_value = safe_float_conversion(raw_value, f"Output {self._output_name}", "Calib-Factor")
 
     @property
     def available(self) -> bool:
@@ -618,11 +688,10 @@ class CresOutputCalibFactorNumber(CoordinatorEntity, NumberEntity):
 
     @property
     def native_value(self):
-        if not self.coordinator.data:
-            return 1
-        output_data = self.coordinator.data.get("outputs", {}).get(self._output_name, {})
-        raw_value = output_data.get("calibFactor", 1)
-        return safe_float_conversion(raw_value, f"Output {self._output_name}", "Calib-Factor")
+        if self._attr_native_value is not None:
+            return self._attr_native_value
+        self._update_from_coordinator()
+        return self._attr_native_value
 
     @property
     def native_min_value(self):
@@ -652,10 +721,11 @@ class CresOutputCalibFactorNumber(CoordinatorEntity, NumberEntity):
 
     async def async_set_native_value(self, value: float):
         _LOGGER.debug(f"Setting output {self._output_name} calibration factor to {value}")
+        self._attr_native_value = value
+        self.async_write_ha_state()
         await self.coordinator.controller.outputs.set_output_calib_factor(
             self._output_name, value
         )
-        self.async_write_ha_state()
 
 
 class CresOutputThresholdNumber(CoordinatorEntity, NumberEntity):
@@ -665,6 +735,15 @@ class CresOutputThresholdNumber(CoordinatorEntity, NumberEntity):
         self._entry = entry
         self._configured_name = configured_name or f"Output{output_name.upper()}"
         self._device_id = f"{DOMAIN}_output_{output_name}_device"
+        self._attr_native_value = None
+
+    def _update_from_coordinator(self):
+        if not self.coordinator.data:
+            self._attr_native_value = 0
+            return
+        output_data = self.coordinator.data.get("outputs", {}).get(self._output_name, {})
+        raw_value = output_data.get("threshold", 0)
+        self._attr_native_value = safe_float_conversion(raw_value, f"Output {self._output_name}", "Threshold")
 
     @property
     def available(self) -> bool:
@@ -680,11 +759,10 @@ class CresOutputThresholdNumber(CoordinatorEntity, NumberEntity):
 
     @property
     def native_value(self):
-        if not self.coordinator.data:
-            return 0
-        output_data = self.coordinator.data.get("outputs", {}).get(self._output_name, {})
-        raw_value = output_data.get("threshold", 0)
-        return safe_float_conversion(raw_value, f"Output {self._output_name}", "Threshold")
+        if self._attr_native_value is not None:
+            return self._attr_native_value
+        self._update_from_coordinator()
+        return self._attr_native_value
 
     @property
     def native_min_value(self):
@@ -714,8 +792,9 @@ class CresOutputThresholdNumber(CoordinatorEntity, NumberEntity):
 
     async def async_set_native_value(self, value: float):
         _LOGGER.debug(f"Setting output {self._output_name} threshold to {value}")
-        await self.coordinator.controller.outputs.set_output_threshold(self._output_name, value)
+        self._attr_native_value = value
         self.async_write_ha_state()
+        await self.coordinator.controller.outputs.set_output_threshold(self._output_name, value)
 
 
 class CresOutputPWMFrequencyNumber(CoordinatorEntity, NumberEntity):
@@ -726,6 +805,20 @@ class CresOutputPWMFrequencyNumber(CoordinatorEntity, NumberEntity):
         self._configured_name = configured_name or f"Output{output_name.upper()}"
         self._entity_type = entity_type
         self._device_id = f"{DOMAIN}_output_{output_name}_device"
+        self._attr_native_value = None
+
+    def _update_from_coordinator(self):
+        if not self.coordinator.data:
+            self._attr_native_value = 0
+            return
+        output_data = self.coordinator.data.get("outputs", {}).get(self._output_name, {})
+        raw_value = output_data.get("pwmFrequency", 0)
+        converted_value = safe_float_conversion(raw_value, f"Output {self._output_name}", "PWM Frequency")
+        # Return 0 if PWM is not configured yet (device returns 0)
+        if converted_value <= 0:
+            self._attr_native_value = 0
+        else:
+            self._attr_native_value = converted_value
 
     @property
     def available(self) -> bool:
@@ -742,15 +835,10 @@ class CresOutputPWMFrequencyNumber(CoordinatorEntity, NumberEntity):
 
     @property
     def native_value(self):
-        if not self.coordinator.data:
-            return 0
-        output_data = self.coordinator.data.get("outputs", {}).get(self._output_name, {})
-        raw_value = output_data.get("pwmFrequency", 0)
-        converted_value = safe_float_conversion(raw_value, f"Output {self._output_name}", "PWM Frequency")
-        # Return 0 if PWM is not configured yet (device returns 0)
-        if converted_value <= 0:
-            return 0
-        return converted_value
+        if self._attr_native_value is not None:
+            return self._attr_native_value
+        self._update_from_coordinator()
+        return self._attr_native_value
 
     @property
     def native_min_value(self):
@@ -758,7 +846,7 @@ class CresOutputPWMFrequencyNumber(CoordinatorEntity, NumberEntity):
 
     @property
     def native_max_value(self):
-        return 1000
+        return 5000
 
     @property
     def native_step(self):
@@ -780,10 +868,11 @@ class CresOutputPWMFrequencyNumber(CoordinatorEntity, NumberEntity):
 
     async def async_set_native_value(self, value: float):
         _LOGGER.debug(f"Setting output {self._output_name} PWM frequency to {value}")
+        self._attr_native_value = value
+        self.async_write_ha_state()
         await self.coordinator.controller.outputs.set_output_pwm_frequency(
             self._output_name, value
         )
-        self.async_write_ha_state()
 
 
 class CresSwitchDutyCycleNumber(CoordinatorEntity, NumberEntity):
@@ -793,6 +882,15 @@ class CresSwitchDutyCycleNumber(CoordinatorEntity, NumberEntity):
         self._entry = entry
         self._configured_name = configured_name or f"Switch{switch_name.upper()}"
         self._device_id = f"{DOMAIN}_{switch_name}_device"
+        self._attr_native_value = None
+
+    def _update_from_coordinator(self):
+        if not self.coordinator.data:
+            self._attr_native_value = 0
+            return
+        switch_data = self.coordinator.data.get("switches", {}).get(self._switch_name, {})
+        raw_value = switch_data.get("duty-cycle", 0)
+        self._attr_native_value = safe_float_conversion(raw_value, f"Switch {self._switch_name}", "Duty Cycle")
 
     @property
     def available(self) -> bool:
@@ -808,11 +906,10 @@ class CresSwitchDutyCycleNumber(CoordinatorEntity, NumberEntity):
 
     @property
     def native_value(self):
-        if not self.coordinator.data:
-            return 0
-        switch_data = self.coordinator.data.get("switches", {}).get(self._switch_name, {})
-        raw_value = switch_data.get("duty-cycle", 0)
-        return safe_float_conversion(raw_value, f"Switch {self._switch_name}", "Duty Cycle")
+        if self._attr_native_value is not None:
+            return self._attr_native_value
+        self._update_from_coordinator()
+        return self._attr_native_value
 
     @property
     def native_min_value(self):
@@ -842,10 +939,11 @@ class CresSwitchDutyCycleNumber(CoordinatorEntity, NumberEntity):
 
     async def async_set_native_value(self, value: float):
         _LOGGER.debug(f"Setting switch {self._switch_name} duty cycle to {value}")
+        self._attr_native_value = value
+        self.async_write_ha_state()
         await self.coordinator.controller.switches.set_duty_cycle(
             self._switch_name, value
         )
-        self.async_write_ha_state()
 
 
 class CresSwitchPWMFrequencyNumber(CoordinatorEntity, NumberEntity):
@@ -855,6 +953,20 @@ class CresSwitchPWMFrequencyNumber(CoordinatorEntity, NumberEntity):
         self._entry = entry
         self._configured_name = configured_name or f"Switch{switch_name.upper()}"
         self._device_id = f"{DOMAIN}_{switch_name}_device"
+        self._attr_native_value = None
+
+    def _update_from_coordinator(self):
+        if not self.coordinator.data:
+            self._attr_native_value = 0
+            return
+        switch_data = self.coordinator.data.get("switches", {}).get(self._switch_name, {})
+        raw_value = switch_data.get("pwm-frequency", 0)
+        converted_value = safe_float_conversion(raw_value, f"Switch {self._switch_name}", "PWM Frequency")
+        # Return 0 if PWM is not configured yet (device returns 0)
+        if converted_value <= 0:
+            self._attr_native_value = 0
+        else:
+            self._attr_native_value = converted_value
 
     @property
     def available(self) -> bool:
@@ -870,15 +982,10 @@ class CresSwitchPWMFrequencyNumber(CoordinatorEntity, NumberEntity):
 
     @property
     def native_value(self):
-        if not self.coordinator.data:
-            return 0
-        switch_data = self.coordinator.data.get("switches", {}).get(self._switch_name, {})
-        raw_value = switch_data.get("pwm-frequency", 0)
-        converted_value = safe_float_conversion(raw_value, f"Switch {self._switch_name}", "PWM Frequency")
-        # Return 0 if PWM is not configured yet (device returns 0)
-        if converted_value <= 0:
-            return 0
-        return converted_value
+        if self._attr_native_value is not None:
+            return self._attr_native_value
+        self._update_from_coordinator()
+        return self._attr_native_value
 
     @property
     def native_min_value(self):
@@ -886,7 +993,7 @@ class CresSwitchPWMFrequencyNumber(CoordinatorEntity, NumberEntity):
 
     @property
     def native_max_value(self):
-        return 1000
+        return 5000
 
     @property
     def native_step(self):
@@ -908,7 +1015,8 @@ class CresSwitchPWMFrequencyNumber(CoordinatorEntity, NumberEntity):
 
     async def async_set_native_value(self, value: float):
         _LOGGER.debug(f"Setting switch {self._switch_name} PWM frequency to {value}")
+        self._attr_native_value = value
+        self.async_write_ha_state()
         await self.coordinator.controller.switches.set_pwm_frequency(
             self._switch_name, value
         )
-        self.async_write_ha_state()

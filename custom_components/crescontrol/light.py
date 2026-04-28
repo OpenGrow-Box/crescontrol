@@ -68,6 +68,8 @@ class CresOutputLightEntity(CoordinatorEntity, LightEntity):
         self._is_dimmable = is_dimmable
         self._custom_name = custom_name or f"Light{output_name.upper()}"
         self._device_id = f"{DOMAIN}_output_{output_name}_device"
+        self._attr_is_on = None
+        self._attr_brightness = None
 
     @property
     def available(self) -> bool:
@@ -107,26 +109,41 @@ class CresOutputLightEntity(CoordinatorEntity, LightEntity):
             return {ColorMode.BRIGHTNESS}
         return {ColorMode.ONOFF}
 
+    def _update_from_coordinator(self):
+        """Update local state from coordinator data."""
+        if not self.coordinator.data:
+            return
+        output_data = self.coordinator.data.get("outputs", {}).get(self._output_name, {})
+        enabled = output_data.get("enabled", False)
+        voltage = output_data.get("voltage", 0)
+        self._attr_is_on = enabled
+        if self._is_dimmable:
+            try:
+                self._attr_brightness = int((float(voltage) / 10.0) * 255)
+            except (ValueError, TypeError):
+                self._attr_brightness = 0
+        else:
+            self._attr_brightness = 255 if enabled else 0
+
     @property
     def is_on(self):
+        if self._attr_is_on is not None:
+            return self._attr_is_on
         if not self.coordinator.data:
             return False
-        output_data = self.coordinator.data.get("outputs", {}).get(self._output_name, {})
-        return output_data.get("enabled", False)
+        self._update_from_coordinator()
+        return self._attr_is_on if self._attr_is_on is not None else False
 
     @property
     def brightness(self):
+        if self._attr_brightness is not None:
+            return self._attr_brightness
         if not self._is_dimmable:
             return 255 if self.is_on else 0
-
         if not self.coordinator.data:
             return 0
-        output_data = self.coordinator.data.get("outputs", {}).get(self._output_name, {})
-        voltage = output_data.get("voltage", 0)
-        try:
-            return int((float(voltage) / 10.0) * 255)
-        except (ValueError, TypeError):
-            return 0
+        self._update_from_coordinator()
+        return self._attr_brightness if self._attr_brightness is not None else 0
 
     async def async_turn_on(self, **kwargs):
         brightness = kwargs.get(ATTR_BRIGHTNESS, 255)
@@ -140,11 +157,12 @@ class CresOutputLightEntity(CoordinatorEntity, LightEntity):
             await self.coordinator.controller.outputs.set_output_pwm_enabled(
                 self._output_name, True
             )
+            self._attr_brightness = brightness
 
         await self.coordinator.controller.outputs.set_output_enabled(
             self._output_name, True
         )
-        # Update state directly without full refresh
+        self._attr_is_on = True
         self.async_write_ha_state()
         _LOGGER.debug(f"Turned on output light {self._output_name}")
 
@@ -156,7 +174,8 @@ class CresOutputLightEntity(CoordinatorEntity, LightEntity):
             await self.coordinator.controller.outputs.set_output_voltage(
                 self._output_name, 0
             )
-        # Update state directly without full refresh
+            self._attr_brightness = 0
+        self._attr_is_on = False
         self.async_write_ha_state()
         _LOGGER.debug(f"Turned off output light {self._output_name}")
 
@@ -170,6 +189,8 @@ class CresSwitchLightEntity(CoordinatorEntity, LightEntity):
         self._entry = entry
         self._custom_name = custom_name or f"Switch{switch_name.upper()}"
         self._device_id = f"{DOMAIN}_{switch_name}_device"
+        self._attr_is_on = None
+        self._attr_brightness = None
 
     @property
     def available(self) -> bool:
@@ -207,23 +228,36 @@ class CresSwitchLightEntity(CoordinatorEntity, LightEntity):
     def supported_color_modes(self):
         return {ColorMode.BRIGHTNESS}
 
+    def _update_from_coordinator(self):
+        """Update local state from coordinator data."""
+        if not self.coordinator.data:
+            return
+        switch_data = self.coordinator.data.get("switches", {}).get(self._switch_name, {})
+        enabled = switch_data.get("enabled", False)
+        duty_cycle = switch_data.get("duty-cycle", 0)
+        self._attr_is_on = enabled
+        try:
+            self._attr_brightness = int((float(duty_cycle) / 100.0) * 255)
+        except (ValueError, TypeError):
+            self._attr_brightness = 0
+
     @property
     def is_on(self):
+        if self._attr_is_on is not None:
+            return self._attr_is_on
         if not self.coordinator.data:
             return False
-        switch_data = self.coordinator.data.get("switches", {}).get(self._switch_name, {})
-        return switch_data.get("enabled", False)
+        self._update_from_coordinator()
+        return self._attr_is_on if self._attr_is_on is not None else False
 
     @property
     def brightness(self):
+        if self._attr_brightness is not None:
+            return self._attr_brightness
         if not self.coordinator.data:
             return 0
-        switch_data = self.coordinator.data.get("switches", {}).get(self._switch_name, {})
-        duty_cycle = switch_data.get("duty-cycle", 0)
-        try:
-            return int((float(duty_cycle) / 100.0) * 255)
-        except (ValueError, TypeError):
-            return 0
+        self._update_from_coordinator()
+        return self._attr_brightness if self._attr_brightness is not None else 0
 
     async def async_turn_on(self, **kwargs):
         brightness = kwargs.get(ATTR_BRIGHTNESS, 255)
@@ -232,13 +266,16 @@ class CresSwitchLightEntity(CoordinatorEntity, LightEntity):
         await self.coordinator.controller.switches.set_pwm_enabled(self._switch_name, True)
         await self.coordinator.controller.switches.set_duty_cycle(self._switch_name, duty_cycle)
         await self.coordinator.controller.switches.set_switch_enabled(self._switch_name, True)
-        # Update state directly without full refresh
+        self._attr_is_on = True
+        self._attr_brightness = brightness
         self.async_write_ha_state()
         _LOGGER.debug(f"Turned on switch light {self._switch_name} at {duty_cycle}%")
 
     async def async_turn_off(self, **kwargs):
         await self.coordinator.controller.switches.set_switch_enabled(self._switch_name, False)
         await self.coordinator.controller.switches.set_duty_cycle(self._switch_name, 0)
+        self._attr_is_on = False
+        self._attr_brightness = 0
         self.async_write_ha_state()
         _LOGGER.debug(f"Turned off switch light {self._switch_name}")
 
@@ -251,6 +288,8 @@ class CresFanLightEntity(CoordinatorEntity, LightEntity):
         self._entry = entry
         self._custom_name = custom_name or "Ventilation"
         self._device_id = f"{DOMAIN}_fan_device"
+        self._attr_is_on = None
+        self._attr_brightness = None
 
     @property
     def available(self) -> bool:
@@ -286,23 +325,36 @@ class CresFanLightEntity(CoordinatorEntity, LightEntity):
     def supported_color_modes(self):
         return {ColorMode.BRIGHTNESS}
 
+    def _update_from_coordinator(self):
+        """Update local state from coordinator data."""
+        if not self.coordinator.data:
+            return
+        fan_data = self.coordinator.data.get("fan", {})
+        enabled = fan_data.get("enabled", False)
+        duty_cycle = fan_data.get("dutyCycle", 0)
+        self._attr_is_on = enabled
+        try:
+            self._attr_brightness = int((float(duty_cycle) / 100.0) * 255)
+        except (ValueError, TypeError):
+            self._attr_brightness = 0
+
     @property
     def is_on(self):
+        if self._attr_is_on is not None:
+            return self._attr_is_on
         if not self.coordinator.data:
             return False
-        fan_data = self.coordinator.data.get("fan", {})
-        return fan_data.get("enabled", False)
+        self._update_from_coordinator()
+        return self._attr_is_on if self._attr_is_on is not None else False
 
     @property
     def brightness(self):
+        if self._attr_brightness is not None:
+            return self._attr_brightness
         if not self.coordinator.data:
             return 0
-        fan_data = self.coordinator.data.get("fan", {})
-        duty_cycle = fan_data.get("dutyCycle", 0)
-        try:
-            return int((float(duty_cycle) / 100.0) * 255)
-        except (ValueError, TypeError):
-            return 0
+        self._update_from_coordinator()
+        return self._attr_brightness if self._attr_brightness is not None else 0
 
     async def async_turn_on(self, **kwargs):
         brightness = kwargs.get(ATTR_BRIGHTNESS, 255)
@@ -310,13 +362,15 @@ class CresFanLightEntity(CoordinatorEntity, LightEntity):
 
         await self.coordinator.controller.fan.setFanEnabled(True)
         await self.coordinator.controller.fan.setFanDutyCycle(duty_cycle)
-        # Update state directly without full refresh
+        self._attr_is_on = True
+        self._attr_brightness = brightness
         self.async_write_ha_state()
         _LOGGER.debug(f"Turned on fan light at {duty_cycle}%")
 
     async def async_turn_off(self, **kwargs):
         await self.coordinator.controller.fan.setFanEnabled(False)
         await self.coordinator.controller.fan.setFanDutyCycle(0)
-        # Update state directly without full refresh
+        self._attr_is_on = False
+        self._attr_brightness = 0
         self.async_write_ha_state()
         _LOGGER.debug("Turned off fan light")

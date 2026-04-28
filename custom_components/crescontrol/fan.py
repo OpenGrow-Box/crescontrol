@@ -59,6 +59,8 @@ class CresFanEntity(CoordinatorEntity, FanEntity):
         self._entry = entry
         self._custom_name = custom_name or "Ventilation"
         self._device_id = f"{DOMAIN}_fan_device"
+        self._attr_is_on = None
+        self._attr_percentage = None
 
     @property
     def available(self) -> bool:
@@ -90,37 +92,37 @@ class CresFanEntity(CoordinatorEntity, FanEntity):
             | FanEntityFeature.TURN_OFF
         )
 
-    @property
-    def is_on(self):
+    def _update_from_coordinator(self):
+        """Update local state from coordinator data."""
         if not self.coordinator.data:
-            return False
+            return
         fan_data = self.coordinator.data.get("fan", {})
         enabled = fan_data.get("enabled", False)
         duty_cycle = fan_data.get("dutyCycle", 0)
-
         try:
             duty_cycle = float(duty_cycle)
         except (ValueError, TypeError):
             duty_cycle = 0
+        self._attr_is_on = enabled and duty_cycle > 0
+        self._attr_percentage = float(duty_cycle) if enabled else 0
 
-        return enabled and duty_cycle > 0
+    @property
+    def is_on(self):
+        if self._attr_is_on is not None:
+            return self._attr_is_on
+        if not self.coordinator.data:
+            return False
+        self._update_from_coordinator()
+        return self._attr_is_on if self._attr_is_on is not None else False
 
     @property
     def percentage(self):
+        if self._attr_percentage is not None:
+            return self._attr_percentage
         if not self.coordinator.data:
             return 0
-        fan_data = self.coordinator.data.get("fan", {})
-        enabled = fan_data.get("enabled", False)
-        duty_cycle = fan_data.get("dutyCycle", 0)
-
-        if not enabled:
-            return 0
-
-        try:
-            return float(duty_cycle)
-        except (ValueError, TypeError):
-            _LOGGER.error(f"Invalid duty_cycle value: {duty_cycle}")
-            return 0
+        self._update_from_coordinator()
+        return self._attr_percentage if self._attr_percentage is not None else 0
 
     async def async_turn_on(self, percentage=None, preset_mode=None, **kwargs):
         _LOGGER.debug(f"Turning on fan with percentage {percentage}")
@@ -132,25 +134,34 @@ class CresFanEntity(CoordinatorEntity, FanEntity):
                 minduty = await self.coordinator.controller.fan.getFanDutyCycleMin()
             await self.coordinator.controller.fan.setFanEnabled(True)
             await self.coordinator.controller.fan.setFanDutyCycle(float(minduty))
+            self._attr_is_on = True
+            self._attr_percentage = float(minduty)
         else:
             await self.coordinator.controller.fan.setFanEnabled(True)
             await self.coordinator.controller.fan.setFanDutyCycle(float(percentage))
+            self._attr_is_on = True
+            self._attr_percentage = float(percentage)
         self.async_write_ha_state()
 
     async def async_turn_off(self, **kwargs):
         _LOGGER.debug("Turning off fan")
         await self.coordinator.controller.fan.setFanEnabled(False)
         await self.coordinator.controller.fan.setFanDutyCycle(0)
+        self._attr_is_on = False
+        self._attr_percentage = 0
         self.async_write_ha_state()
 
     async def async_set_percentage(self, percentage):
         _LOGGER.debug(f"Setting fan percentage to {percentage}")
         if percentage > 0:
             await self.coordinator.controller.fan.setFanEnabled(True)
+            self._attr_is_on = True
         else:
             await self.coordinator.controller.fan.setFanEnabled(False)
+            self._attr_is_on = False
 
         await self.coordinator.controller.fan.setFanDutyCycle(float(percentage))
+        self._attr_percentage = float(percentage)
         self.async_write_ha_state()
 
 
@@ -164,6 +175,8 @@ class CresOutputFanEntity(CoordinatorEntity, FanEntity):
         self._is_pwm = is_pwm
         self._custom_name = custom_name or f"Fan{output_name.upper()}"
         self._device_id = f"{DOMAIN}_output_{output_name}_device"
+        self._attr_is_on = None
+        self._attr_percentage = None
 
     @property
     def available(self) -> bool:
@@ -197,26 +210,39 @@ class CresOutputFanEntity(CoordinatorEntity, FanEntity):
             )
         return FanEntityFeature.TURN_ON | FanEntityFeature.TURN_OFF
 
+    def _update_from_coordinator(self):
+        """Update local state from coordinator data."""
+        if not self.coordinator.data:
+            return
+        output_data = self.coordinator.data.get("outputs", {}).get(self._output_name, {})
+        enabled = output_data.get("enabled", False)
+        voltage = output_data.get("voltage", 0)
+        self._attr_is_on = enabled
+        if self._is_pwm:
+            try:
+                self._attr_percentage = int((float(voltage) / 10.0) * 100)
+            except (ValueError, TypeError):
+                self._attr_percentage = 0
+        else:
+            self._attr_percentage = 100 if enabled else 0
+
     @property
     def is_on(self):
+        if self._attr_is_on is not None:
+            return self._attr_is_on
         if not self.coordinator.data:
             return False
-        output_data = self.coordinator.data.get("outputs", {}).get(self._output_name, {})
-        return output_data.get("enabled", False)
+        self._update_from_coordinator()
+        return self._attr_is_on if self._attr_is_on is not None else False
 
     @property
     def percentage(self):
+        if self._attr_percentage is not None:
+            return self._attr_percentage
         if not self.coordinator.data:
             return 0
-        if not self._is_pwm:
-            return 100 if self.is_on else 0
-
-        output_data = self.coordinator.data.get("outputs", {}).get(self._output_name, {})
-        voltage = output_data.get("voltage", 0)
-        try:
-            return int((float(voltage) / 10.0) * 100)
-        except (ValueError, TypeError):
-            return 0
+        self._update_from_coordinator()
+        return self._attr_percentage if self._attr_percentage is not None else 0
 
     async def async_turn_on(self, percentage=None, preset_mode=None, **kwargs):
         if percentage is not None and self._is_pwm:
@@ -228,11 +254,12 @@ class CresOutputFanEntity(CoordinatorEntity, FanEntity):
             await self.coordinator.controller.outputs.set_output_pwm_enabled(
                 self._output_name, True
             )
+            self._attr_percentage = percentage
 
         await self.coordinator.controller.outputs.set_output_enabled(
             self._output_name, True
         )
-        # Update state directly without full refresh
+        self._attr_is_on = True
         self.async_write_ha_state()
 
     async def async_turn_off(self, **kwargs):
@@ -243,7 +270,8 @@ class CresOutputFanEntity(CoordinatorEntity, FanEntity):
             await self.coordinator.controller.outputs.set_output_voltage(
                 self._output_name, 0
             )
-        # Update state directly without full refresh
+            self._attr_percentage = 0
+        self._attr_is_on = False
         self.async_write_ha_state()
 
     async def async_set_percentage(self, percentage):
@@ -263,13 +291,14 @@ class CresOutputFanEntity(CoordinatorEntity, FanEntity):
             await self.coordinator.controller.outputs.set_output_enabled(
                 self._output_name, True
             )
+            self._attr_is_on = True
         else:
             await self.coordinator.controller.outputs.set_output_enabled(
                 self._output_name, False
             )
+            self._attr_is_on = False
 
-        # Update state directly without full refresh
-
+        self._attr_percentage = percentage
         self.async_write_ha_state()
 
 
@@ -282,6 +311,8 @@ class CresSwitchFanEntity(CoordinatorEntity, FanEntity):
         self._entry = entry
         self._custom_name = custom_name or f"Fan{switch_name.upper()}"
         self._device_id = f"{DOMAIN}_{switch_name}_device"
+        self._attr_is_on = None
+        self._attr_percentage = None
 
     @property
     def available(self) -> bool:
@@ -313,51 +344,68 @@ class CresSwitchFanEntity(CoordinatorEntity, FanEntity):
             | FanEntityFeature.TURN_OFF
         )
 
+    def _update_from_coordinator(self):
+        """Update local state from coordinator data."""
+        if not self.coordinator.data:
+            return
+        switch_data = self.coordinator.data.get("switches", {}).get(self._switch_name, {})
+        enabled = switch_data.get("enabled", False)
+        duty_cycle = switch_data.get("duty-cycle", 0)
+        self._attr_is_on = enabled
+        try:
+            self._attr_percentage = int(float(duty_cycle))
+        except (ValueError, TypeError):
+            self._attr_percentage = 0
+
     @property
     def is_on(self):
+        if self._attr_is_on is not None:
+            return self._attr_is_on
         if not self.coordinator.data:
             return False
-        switch_data = self.coordinator.data.get("switches", {}).get(self._switch_name, {})
-        return switch_data.get("enabled", False)
+        self._update_from_coordinator()
+        return self._attr_is_on if self._attr_is_on is not None else False
 
     @property
     def percentage(self):
+        if self._attr_percentage is not None:
+            return self._attr_percentage
         if not self.coordinator.data:
             return 0
-        switch_data = self.coordinator.data.get("switches", {}).get(self._switch_name, {})
-        duty_cycle = switch_data.get("duty-cycle", 0)
-        try:
-            return int(float(duty_cycle))
-        except (ValueError, TypeError):
-            return 0
+        self._update_from_coordinator()
+        return self._attr_percentage if self._attr_percentage is not None else 0
 
     async def async_turn_on(self, percentage=None, preset_mode=None, **kwargs):
         if percentage is not None:
             await self.coordinator.controller.switches.set_duty_cycle(
                 self._switch_name, percentage
             )
+            self._attr_percentage = percentage
 
         await self.coordinator.controller.switches.set_pwm_enabled(self._switch_name, True)
         await self.coordinator.controller.switches.set_switch_enabled(self._switch_name, True)
-        # Update state directly without full refresh
+        self._attr_is_on = True
         self.async_write_ha_state()
 
     async def async_turn_off(self, **kwargs):
         await self.coordinator.controller.switches.set_switch_enabled(self._switch_name, False)
         await self.coordinator.controller.switches.set_duty_cycle(self._switch_name, 0)
+        self._attr_is_on = False
+        self._attr_percentage = 0
         self.async_write_ha_state()
 
     async def async_set_percentage(self, percentage):
         await self.coordinator.controller.switches.set_duty_cycle(
             self._switch_name, percentage
         )
+        self._attr_percentage = percentage
 
         if percentage > 0:
             await self.coordinator.controller.switches.set_pwm_enabled(self._switch_name, True)
             await self.coordinator.controller.switches.set_switch_enabled(self._switch_name, True)
+            self._attr_is_on = True
         else:
             await self.coordinator.controller.switches.set_switch_enabled(self._switch_name, False)
-
-        # Update state directly without full refresh
+            self._attr_is_on = False
 
         self.async_write_ha_state()
