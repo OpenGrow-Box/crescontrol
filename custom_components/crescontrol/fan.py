@@ -245,15 +245,20 @@ class CresOutputFanEntity(CoordinatorEntity, FanEntity):
         return self._attr_percentage if self._attr_percentage is not None else 0
 
     async def async_turn_on(self, percentage=None, preset_mode=None, **kwargs):
+        # Check if PWM mode is enabled in config
+        output_config = self._entry.data.get(CONF_OUTPUTS, {}).get(self._output_name, {})
+        pwm_mode = output_config.get("pwm_mode", False)
+        
         if percentage is not None and self._is_pwm:
             voltage = (percentage / 100.0) * 10.0
             await self.coordinator.controller.outputs.set_output_voltage(
                 self._output_name, voltage
             )
-            # Enable PWM for PWM outputs
-            await self.coordinator.controller.outputs.set_output_pwm_enabled(
-                self._output_name, True
-            )
+            # Only enable PWM if explicitly configured
+            if pwm_mode:
+                await self.coordinator.controller.outputs.set_output_pwm_enabled(
+                    self._output_name, True
+                )
             self._attr_percentage = percentage
 
         await self.coordinator.controller.outputs.set_output_enabled(

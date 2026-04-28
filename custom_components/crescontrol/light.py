@@ -143,10 +143,12 @@ class CresOutputLightEntity(CoordinatorEntity, LightEntity):
             await self.coordinator.controller.outputs.set_output_voltage(
                 self._output_name, voltage
             )
-            # Enable PWM for dimmable outputs
-            await self.coordinator.controller.outputs.set_output_pwm_enabled(
-                self._output_name, True
-            )
+            # Only enable PWM if explicitly configured in output settings
+            output_config = self._entry.data.get(CONF_OUTPUTS, {}).get(self._output_name, {})
+            if output_config.get("pwm_mode", False):
+                await self.coordinator.controller.outputs.set_output_pwm_enabled(
+                    self._output_name, True
+                )
             self._attr_brightness = brightness
 
         await self.coordinator.controller.outputs.set_output_enabled(

@@ -36,6 +36,9 @@ INPUT_CHANNELS = ["a", "b"]
 # PWM capable outputs
 PWM_OUTPUTS = ["a", "b"]
 
+# PWM mode configuration
+CONF_PWM_MODE = "pwm_mode"
+
 # Input sensor types
 SENSOR_TYPE_NONE = "none"
 SENSOR_TYPE_VOLTAGE = "voltage"

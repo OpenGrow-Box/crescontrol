@@ -109,9 +109,11 @@ class CresControlConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     # Auto-generate name from type + channel if empty
                     if not custom_name or not custom_name.strip():
                         custom_name = f"{entity_type.capitalize()}{output.upper()}"
+                    pwm_mode = user_input.get(f"output_{output}_pwm", False)
                     self._outputs[output] = {
                         "type": entity_type,
                         "name": custom_name.replace(" ", ""),
+                        "pwm_mode": pwm_mode,
                     }
 
             return await self.async_step_switches()
@@ -123,6 +125,9 @@ class CresControlConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
             schema_dict[vol.Optional(f"output_{output}_type", default=default_type)] = vol.In(ENTITY_TYPE_OPTIONS)
             schema_dict[vol.Optional(f"output_{output}_name", default="")] = str
+            # Add PWM mode checkbox for PWM-capable outputs
+            if is_pwm:
+                schema_dict[vol.Optional(f"output_{output}_pwm", default=False)] = bool
 
         return self.async_show_form(
             step_id="outputs",
@@ -254,9 +259,11 @@ class CresControlOptionsFlowHandler(config_entries.OptionsFlow):
                     custom_name = user_input.get(f"output_{output}_name", "")
                     if not custom_name or not custom_name.strip():
                         custom_name = f"{entity_type.capitalize()}{output.upper()}"
+                    pwm_mode = user_input.get(f"output_{output}_pwm", False)
                     output_config[output] = {
                         "type": entity_type,
                         "name": custom_name.replace(" ", ""),
+                        "pwm_mode": pwm_mode,
                     }
 
             # Parse switches

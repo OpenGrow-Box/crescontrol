@@ -114,11 +114,13 @@ class CresOutputSwitchEntity(CoordinatorEntity, SwitchEntity):
         return "mdi:power-socket"
 
     async def async_turn_on(self, **kwargs):
-        # Enable PWM for PWM-capable outputs (A, B)
+        # Only enable PWM if explicitly configured in output settings
         if self._output_name in PWM_OUTPUTS:
-            await self.coordinator.controller.outputs.set_output_pwm_enabled(
-                self._output_name, True
-            )
+            output_config = self._entry.data.get(CONF_OUTPUTS, {}).get(self._output_name, {})
+            if output_config.get("pwm_mode", False):
+                await self.coordinator.controller.outputs.set_output_pwm_enabled(
+                    self._output_name, True
+                )
         await self.coordinator.controller.outputs.set_output_enabled(
             self._output_name, True
         )
