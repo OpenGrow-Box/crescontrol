@@ -28,13 +28,13 @@ async def async_setup_entry(hass, entry, async_add_entities):
     fan_config = entry.data.get(CONF_FAN, {})
 
     # Create light entities for outputs configured as lights
+    # All outputs support 0-10V dimming, only A&B have additional PWM
     for output_name, cfg in output_config.items():
         if cfg.get("type") == ENTITY_TYPE_LIGHT:
-            is_dimmable = output_name in PWM_OUTPUTS
             custom_name = cfg.get("name", f"Light{output_name.upper()}")
             lights.append(
                 CresOutputLightEntity(
-                    coordinator, output_name, entry, is_dimmable, custom_name
+                    coordinator, output_name, entry, is_dimmable=True, custom_name=custom_name
                 )
             )
             _LOGGER.debug(f"Created light entity: {custom_name}")
@@ -54,60 +54,37 @@ async def async_setup_entry(hass, entry, async_add_entities):
         lights.append(CresFanLightEntity(coordinator, entry, custom_name))
         _LOGGER.debug(f"Created light entity for fan: {custom_name}")
 
-    async_add_entities(lights)
+    async_add_entities(lights, True)
     _LOGGER.info(f"Added {len(lights)} light entities")
 
 
 class CresOutputLightEntity(CoordinatorEntity, LightEntity):
     """Light entity for CresControl outputs."""
 
+    _attr_color_mode = ColorMode.BRIGHTNESS
+    _attr_supported_color_modes = {ColorMode.BRIGHTNESS}
+
     def __init__(self, coordinator, output_name, entry, is_dimmable=False, custom_name=None):
         super().__init__(coordinator)
         self._output_name = output_name
         self._entry = entry
         self._is_dimmable = is_dimmable
-        self._custom_name = custom_name or f"Light{output_name.upper()}"
-        self._device_id = f"{DOMAIN}_output_{output_name}_device"
-        self._attr_is_on = False
-        self._attr_brightness = 0
-
-    @property
-    def available(self) -> bool:
-        return self.coordinator.last_update_success and self.coordinator.data is not None
-
-    @property
-    def unique_id(self):
-        return f"crescontrol_output_{self._output_name}_light_{self._entry.entry_id}"
-
-    @property
-    def name(self):
-        return self._custom_name
-
-    @property
-    def device_info(self):
-        return {
-            "identifiers": {(DOMAIN, self._device_id)},
-            "name": self._custom_name,
+        self._attr_unique_id = f"crescontrol_output_{output_name}_light_{entry.entry_id}"
+        self._attr_name = custom_name or f"Light{output_name.upper()}"
+        self._attr_device_info = {
+            "identifiers": {(DOMAIN, f"{DOMAIN}_output_{output_name}_device")},
+            "name": custom_name or f"Light{output_name.upper()}",
             "manufacturer": "cre.sience",
             "model": "CresControl Output",
             "sw_version": "1.0",
         }
+        self._attr_is_on = False
+        self._attr_brightness = 255
+        self._attr_extra_state_attributes = {"output_channel": output_name}
 
     @property
-    def extra_state_attributes(self):
-        return {
-            "output_channel": self._output_name,
-        }
-
-    @property
-    def color_mode(self):
-        return ColorMode.BRIGHTNESS if self._is_dimmable else ColorMode.ONOFF
-
-    @property
-    def supported_color_modes(self):
-        if self._is_dimmable:
-            return {ColorMode.BRIGHTNESS}
-        return {ColorMode.ONOFF}
+    def available(self) -> bool:
+        return self.coordinator.last_update_success and self.coordinator.data is not None
 
     def _update_from_coordinator(self):
         """Update local state from coordinator data."""
@@ -125,16 +102,6 @@ class CresOutputLightEntity(CoordinatorEntity, LightEntity):
         else:
             self._attr_brightness = 255 if enabled else 0
 
-    @property
-    def is_on(self):
-        return self._attr_is_on
-
-    @property
-    def brightness(self):
-        if not self._is_dimmable:
-            return 255 if self.is_on else 0
-        return self._attr_brightness
-
     async def async_turn_on(self, **kwargs):
         brightness = kwargs.get(ATTR_BRIGHTNESS, 255)
 
@@ -150,6 +117,16 @@ class CresOutputLightEntity(CoordinatorEntity, LightEntity):
                     self._output_name, True
                 )
             self._attr_brightness = brightness
+            
+            # Update coordinator data immediately so all sensors update
+            if self.coordinator.data and "outputs" in self.coordinator.data:
+                if self._output_name in self.coordinator.data["outputs"]:
+                    new_data = dict(self.coordinator.data)
+                    new_data["outputs"] = dict(new_data["outputs"])
+                    new_data["outputs"][self._output_name] = dict(new_data["outputs"][self._output_name])
+                    new_data["outputs"][self._output_name]["voltage"] = voltage
+                    new_data["outputs"][self._output_name]["enabled"] = True
+                    self.coordinator.async_set_updated_data(new_data)
 
         await self.coordinator.controller.outputs.set_output_enabled(
             self._output_name, True
@@ -167,6 +144,15 @@ class CresOutputLightEntity(CoordinatorEntity, LightEntity):
                 self._output_name, 0
             )
             self._attr_brightness = 0
+            # Update coordinator data immediately so all sensors update
+            if self.coordinator.data and "outputs" in self.coordinator.data:
+                if self._output_name in self.coordinator.data["outputs"]:
+                    new_data = dict(self.coordinator.data)
+                    new_data["outputs"] = dict(new_data["outputs"])
+                    new_data["outputs"][self._output_name] = dict(new_data["outputs"][self._output_name])
+                    new_data["outputs"][self._output_name]["voltage"] = 0
+                    new_data["outputs"][self._output_name]["enabled"] = False
+                    self.coordinator.async_set_updated_data(new_data)
         self._attr_is_on = False
         self.async_write_ha_state()
         _LOGGER.debug(f"Turned off output light {self._output_name}")
@@ -175,50 +161,29 @@ class CresOutputLightEntity(CoordinatorEntity, LightEntity):
 class CresSwitchLightEntity(CoordinatorEntity, LightEntity):
     """Light entity for CresControl power switches with PWM dimming."""
 
+    _attr_color_mode = ColorMode.BRIGHTNESS
+    _attr_supported_color_modes = {ColorMode.BRIGHTNESS}
+
     def __init__(self, coordinator, switch_name, entry, custom_name=None):
         super().__init__(coordinator)
         self._switch_name = switch_name
         self._entry = entry
-        self._custom_name = custom_name or f"Switch{switch_name.upper()}"
-        self._device_id = f"{DOMAIN}_{switch_name}_device"
-        self._attr_is_on = False
-        self._attr_brightness = 0
-
-    @property
-    def available(self) -> bool:
-        return self.coordinator.last_update_success and self.coordinator.data is not None
-
-    @property
-    def unique_id(self):
-        return f"crescontrol_switch_{self._switch_name}_light_{self._entry.entry_id}"
-
-    @property
-    def name(self):
-        return self._custom_name
-
-    @property
-    def device_info(self):
-        return {
-            "identifiers": {(DOMAIN, self._device_id)},
-            "name": self._custom_name,
+        self._attr_unique_id = f"crescontrol_switch_{switch_name}_light_{entry.entry_id}"
+        self._attr_name = custom_name or f"Switch{switch_name.upper()}"
+        self._attr_device_info = {
+            "identifiers": {(DOMAIN, f"{DOMAIN}_{switch_name}_device")},
+            "name": custom_name or f"Switch{switch_name.upper()}",
             "manufacturer": "cre.sience",
             "model": "CresControl Switch",
             "sw_version": "1.0",
         }
+        self._attr_is_on = False
+        self._attr_brightness = 255
+        self._attr_extra_state_attributes = {"switch_channel": switch_name}
 
     @property
-    def extra_state_attributes(self):
-        return {
-            "switch_channel": self._switch_name,
-        }
-
-    @property
-    def color_mode(self):
-        return ColorMode.BRIGHTNESS
-
-    @property
-    def supported_color_modes(self):
-        return {ColorMode.BRIGHTNESS}
+    def available(self) -> bool:
+        return self.coordinator.last_update_success and self.coordinator.data is not None
 
     def _update_from_coordinator(self):
         """Update local state from coordinator data."""
@@ -232,14 +197,6 @@ class CresSwitchLightEntity(CoordinatorEntity, LightEntity):
             self._attr_brightness = int((float(duty_cycle) / 100.0) * 255)
         except (ValueError, TypeError):
             self._attr_brightness = 0
-
-    @property
-    def is_on(self):
-        return self._attr_is_on
-
-    @property
-    def brightness(self):
-        return self._attr_brightness
 
     async def async_turn_on(self, **kwargs):
         brightness = kwargs.get(ATTR_BRIGHTNESS, 255)
@@ -265,47 +222,28 @@ class CresSwitchLightEntity(CoordinatorEntity, LightEntity):
 class CresFanLightEntity(CoordinatorEntity, LightEntity):
     """Light entity for CresControl fan output (used as dimmable light)."""
 
+    _attr_color_mode = ColorMode.BRIGHTNESS
+    _attr_supported_color_modes = {ColorMode.BRIGHTNESS}
+
     def __init__(self, coordinator, entry, custom_name=None):
         super().__init__(coordinator)
         self._entry = entry
-        self._custom_name = custom_name or "Ventilation"
-        self._device_id = f"{DOMAIN}_fan_device"
-        self._attr_is_on = False
-        self._attr_brightness = 0
-
-    @property
-    def available(self) -> bool:
-        return self.coordinator.last_update_success and self.coordinator.data is not None
-
-    @property
-    def unique_id(self):
-        return f"crescontrol_fan_light_{self._entry.entry_id}"
-
-    @property
-    def name(self):
-        return self._custom_name
-
-    @property
-    def device_info(self):
-        return {
-            "identifiers": {(DOMAIN, self._device_id)},
-            "name": self._custom_name,
+        self._attr_unique_id = f"crescontrol_fan_light_{entry.entry_id}"
+        self._attr_name = custom_name or "Ventilation"
+        self._attr_device_info = {
+            "identifiers": {(DOMAIN, f"{DOMAIN}_fan_device")},
+            "name": custom_name or "Ventilation",
             "manufacturer": "cre.sience",
             "model": "CresControl Fan",
             "sw_version": "1.0",
         }
+        self._attr_is_on = False
+        self._attr_brightness = 255
+        self._attr_extra_state_attributes = {}
 
     @property
-    def extra_state_attributes(self):
-        return {}
-
-    @property
-    def color_mode(self):
-        return ColorMode.BRIGHTNESS
-
-    @property
-    def supported_color_modes(self):
-        return {ColorMode.BRIGHTNESS}
+    def available(self) -> bool:
+        return self.coordinator.last_update_success and self.coordinator.data is not None
 
     def _update_from_coordinator(self):
         """Update local state from coordinator data."""
@@ -319,14 +257,6 @@ class CresFanLightEntity(CoordinatorEntity, LightEntity):
             self._attr_brightness = int((float(duty_cycle) / 100.0) * 255)
         except (ValueError, TypeError):
             self._attr_brightness = 0
-
-    @property
-    def is_on(self):
-        return self._attr_is_on
-
-    @property
-    def brightness(self):
-        return self._attr_brightness
 
     async def async_turn_on(self, **kwargs):
         brightness = kwargs.get(ATTR_BRIGHTNESS, 255)

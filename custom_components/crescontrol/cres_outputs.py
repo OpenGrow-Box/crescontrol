@@ -146,10 +146,12 @@ class CresOutputs:
 
     async def set_output_pwm_frequency(self, output_name, pwm_frequency_value):
         if output_name in self.isPWM:
+            # Ensure we send a float with decimal point
+            freq = float(pwm_frequency_value)
             await self.req._get_request(
-                f"out-{output_name}:pwm-frequency={pwm_frequency_value}"
+                f"out-{output_name}:pwm-frequency={freq}"
             )
-            self.outputs_data[output_name]["pwmFrequency"] = pwm_frequency_value
+            self.outputs_data[output_name]["pwmFrequency"] = freq
 
     async def get_output_threshold(self, output_name):
         self.outputs_data[output_name]["threshold"] = await self.req._get_request(

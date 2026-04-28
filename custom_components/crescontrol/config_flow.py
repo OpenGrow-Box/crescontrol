@@ -242,9 +242,6 @@ class CresControlConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 class CresControlOptionsFlowHandler(config_entries.OptionsFlow):
     """Handle options flow for reconfiguration."""
 
-    def __init__(self, config_entry):
-        self.config_entry = config_entry
-
     async def async_step_init(self, user_input=None):
         """Handle options flow."""
         if user_input is not None:
@@ -332,9 +329,13 @@ class CresControlOptionsFlowHandler(config_entries.OptionsFlow):
             is_pwm = output in PWM_OUTPUTS
             default_type = cfg.get("type", ENTITY_TYPE_LIGHT if is_pwm else ENTITY_TYPE_NONE)
             default_name = cfg.get("name", "")
+            default_pwm = cfg.get("pwm_mode", False)
 
             schema_dict[vol.Optional(f"output_{output}_type", default=default_type)] = vol.In(ENTITY_TYPE_OPTIONS)
             schema_dict[vol.Optional(f"output_{output}_name", default=default_name)] = str
+            # Add PWM mode checkbox for PWM-capable outputs
+            if is_pwm:
+                schema_dict[vol.Optional(f"output_{output}_pwm", default=default_pwm)] = bool
 
         # Switch fields
         for switch in SWITCH_CHANNELS:

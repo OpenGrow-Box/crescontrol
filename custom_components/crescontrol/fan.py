@@ -29,12 +29,12 @@ async def async_setup_entry(hass, entry, async_add_entities):
         _LOGGER.debug(f"Created fan entity: {custom_name}")
 
     # Create fan entities for outputs configured as fans
+    # All outputs support 0-10V speed control, only A&B have additional PWM
     for output_name, cfg in output_config.items():
         if cfg.get("type") == ENTITY_TYPE_FAN:
-            is_pwm = output_name in PWM_OUTPUTS
             custom_name = cfg.get("name", f"Fan{output_name.upper()}")
             fans.append(
-                CresOutputFanEntity(coordinator, output_name, entry, is_pwm, custom_name)
+                CresOutputFanEntity(coordinator, output_name, entry, is_pwm=True, custom_name=custom_name)
             )
             _LOGGER.debug(f"Created fan entity: {custom_name}")
 
@@ -172,7 +172,9 @@ class CresOutputFanEntity(CoordinatorEntity, FanEntity):
         super().__init__(coordinator)
         self._output_name = output_name
         self._entry = entry
-        self._is_pwm = is_pwm
+        # All outputs support 0-10V speed control
+        # Only A & B have additional PWM capability
+        self._is_pwm = True  # All outputs can do 0-10V speed control
         self._custom_name = custom_name or f"Fan{output_name.upper()}"
         self._device_id = f"{DOMAIN}_output_{output_name}_device"
         self._attr_is_on = None
@@ -202,13 +204,12 @@ class CresOutputFanEntity(CoordinatorEntity, FanEntity):
 
     @property
     def supported_features(self):
-        if self._is_pwm:
-            return (
-                FanEntityFeature.SET_SPEED
-                | FanEntityFeature.TURN_ON
-                | FanEntityFeature.TURN_OFF
-            )
-        return FanEntityFeature.TURN_ON | FanEntityFeature.TURN_OFF
+        # All outputs support 0-10V speed control
+        return (
+            FanEntityFeature.SET_SPEED
+            | FanEntityFeature.TURN_ON
+            | FanEntityFeature.TURN_OFF
+        )
 
     def _update_from_coordinator(self):
         """Update local state from coordinator data."""
@@ -218,13 +219,11 @@ class CresOutputFanEntity(CoordinatorEntity, FanEntity):
         enabled = output_data.get("enabled", False)
         voltage = output_data.get("voltage", 0)
         self._attr_is_on = enabled
-        if self._is_pwm:
-            try:
-                self._attr_percentage = int((float(voltage) / 10.0) * 100)
-            except (ValueError, TypeError):
-                self._attr_percentage = 0
-        else:
-            self._attr_percentage = 100 if enabled else 0
+        # All outputs calculate percentage from voltage (0-10V)
+        try:
+            self._attr_percentage = int((float(voltage) / 10.0) * 100)
+        except (ValueError, TypeError):
+            self._attr_percentage = 0
 
     @property
     def is_on(self):
@@ -245,17 +244,17 @@ class CresOutputFanEntity(CoordinatorEntity, FanEntity):
         return self._attr_percentage if self._attr_percentage is not None else 0
 
     async def async_turn_on(self, percentage=None, preset_mode=None, **kwargs):
-        # Check if PWM mode is enabled in config
+        # Check if PWM mode is enabled in config (only for A & B)
         output_config = self._entry.data.get(CONF_OUTPUTS, {}).get(self._output_name, {})
         pwm_mode = output_config.get("pwm_mode", False)
         
-        if percentage is not None and self._is_pwm:
+        if percentage is not None:
             voltage = (percentage / 100.0) * 10.0
             await self.coordinator.controller.outputs.set_output_voltage(
                 self._output_name, voltage
             )
-            # Only enable PWM if explicitly configured
-            if pwm_mode:
+            # Only enable PWM if explicitly configured AND output supports it (A & B)
+            if pwm_mode and self._output_name in PWM_OUTPUTS:
                 await self.coordinator.controller.outputs.set_output_pwm_enabled(
                     self._output_name, True
                 )
@@ -271,22 +270,14 @@ class CresOutputFanEntity(CoordinatorEntity, FanEntity):
         await self.coordinator.controller.outputs.set_output_enabled(
             self._output_name, False
         )
-        if self._is_pwm:
-            await self.coordinator.controller.outputs.set_output_voltage(
-                self._output_name, 0
-            )
-            self._attr_percentage = 0
+        await self.coordinator.controller.outputs.set_output_voltage(
+            self._output_name, 0
+        )
+        self._attr_percentage = 0
         self._attr_is_on = False
         self.async_write_ha_state()
 
     async def async_set_percentage(self, percentage):
-        if not self._is_pwm:
-            if percentage > 0:
-                await self.async_turn_on()
-            else:
-                await self.async_turn_off()
-            return
-
         voltage = (percentage / 100.0) * 10.0
         await self.coordinator.controller.outputs.set_output_voltage(
             self._output_name, voltage

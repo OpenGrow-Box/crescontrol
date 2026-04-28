@@ -98,10 +98,12 @@ class CresSwitches:
         return self.switch_data[switch_name]["pwm-frequency"]
 
     async def set_pwm_frequency(self, switch_name, frequency):
+        # Ensure we send a float with decimal point
+        freq = float(frequency)
         response = await self.req._get_request(
-            f"switch-{switch_name}:pwm-frequency={frequency}"
+            f"switch-{switch_name}:pwm-frequency={freq}"
         )
-        self.switch_data[switch_name]["pwm-frequency"] = frequency
+        self.switch_data[switch_name]["pwm-frequency"] = freq
         return response
 
     ### Update Methods
