@@ -68,8 +68,8 @@ class CresOutputLightEntity(CoordinatorEntity, LightEntity):
         self._is_dimmable = is_dimmable
         self._custom_name = custom_name or f"Light{output_name.upper()}"
         self._device_id = f"{DOMAIN}_output_{output_name}_device"
-        self._attr_is_on = None
-        self._attr_brightness = None
+        self._attr_is_on = False
+        self._attr_brightness = 0
 
     @property
     def available(self) -> bool:
@@ -127,23 +127,13 @@ class CresOutputLightEntity(CoordinatorEntity, LightEntity):
 
     @property
     def is_on(self):
-        if self._attr_is_on is not None:
-            return self._attr_is_on
-        if not self.coordinator.data:
-            return False
-        self._update_from_coordinator()
-        return self._attr_is_on if self._attr_is_on is not None else False
+        return self._attr_is_on
 
     @property
     def brightness(self):
-        if self._attr_brightness is not None:
-            return self._attr_brightness
         if not self._is_dimmable:
             return 255 if self.is_on else 0
-        if not self.coordinator.data:
-            return 0
-        self._update_from_coordinator()
-        return self._attr_brightness if self._attr_brightness is not None else 0
+        return self._attr_brightness
 
     async def async_turn_on(self, **kwargs):
         brightness = kwargs.get(ATTR_BRIGHTNESS, 255)
@@ -189,8 +179,8 @@ class CresSwitchLightEntity(CoordinatorEntity, LightEntity):
         self._entry = entry
         self._custom_name = custom_name or f"Switch{switch_name.upper()}"
         self._device_id = f"{DOMAIN}_{switch_name}_device"
-        self._attr_is_on = None
-        self._attr_brightness = None
+        self._attr_is_on = False
+        self._attr_brightness = 0
 
     @property
     def available(self) -> bool:
@@ -243,21 +233,11 @@ class CresSwitchLightEntity(CoordinatorEntity, LightEntity):
 
     @property
     def is_on(self):
-        if self._attr_is_on is not None:
-            return self._attr_is_on
-        if not self.coordinator.data:
-            return False
-        self._update_from_coordinator()
-        return self._attr_is_on if self._attr_is_on is not None else False
+        return self._attr_is_on
 
     @property
     def brightness(self):
-        if self._attr_brightness is not None:
-            return self._attr_brightness
-        if not self.coordinator.data:
-            return 0
-        self._update_from_coordinator()
-        return self._attr_brightness if self._attr_brightness is not None else 0
+        return self._attr_brightness
 
     async def async_turn_on(self, **kwargs):
         brightness = kwargs.get(ATTR_BRIGHTNESS, 255)
@@ -288,8 +268,8 @@ class CresFanLightEntity(CoordinatorEntity, LightEntity):
         self._entry = entry
         self._custom_name = custom_name or "Ventilation"
         self._device_id = f"{DOMAIN}_fan_device"
-        self._attr_is_on = None
-        self._attr_brightness = None
+        self._attr_is_on = False
+        self._attr_brightness = 0
 
     @property
     def available(self) -> bool:
@@ -340,21 +320,11 @@ class CresFanLightEntity(CoordinatorEntity, LightEntity):
 
     @property
     def is_on(self):
-        if self._attr_is_on is not None:
-            return self._attr_is_on
-        if not self.coordinator.data:
-            return False
-        self._update_from_coordinator()
-        return self._attr_is_on if self._attr_is_on is not None else False
+        return self._attr_is_on
 
     @property
     def brightness(self):
-        if self._attr_brightness is not None:
-            return self._attr_brightness
-        if not self.coordinator.data:
-            return 0
-        self._update_from_coordinator()
-        return self._attr_brightness if self._attr_brightness is not None else 0
+        return self._attr_brightness
 
     async def async_turn_on(self, **kwargs):
         brightness = kwargs.get(ATTR_BRIGHTNESS, 255)

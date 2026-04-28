@@ -31,15 +31,20 @@ async def async_setup_entry(hass, entry, async_add_entities):
     input_config = entry.data.get(CONF_INPUTS, {})
 
     # Create sensors for built-in sensor devices (temperature, humidity, vpd, co2)
+    # Only create sensor entities if the sensor actually has data for that type
     for device in coordinator.controller.devices:
         if device.device_type == "sensor":
             _LOGGER.debug(f"Detected sensor device: {device.device_id}")
+            # Check what data this sensor actually has
+            sensor_data = coordinator.controller.sensors.sensor_data.get(device.device_id, {})
             for sensor_type in ["temperature", "humidity", "vpd", "co2"]:
-                entity_id = f"{device.device_id.lower()}_{sensor_type}"
-                if entity_id not in [s.unique_id for s in sensors]:
-                    sensors.append(
-                        CresSensorEntity(device, sensor_type, coordinator, entry)
-                    )
+                # Only create entity if sensor has actual data for this type
+                if sensor_type in sensor_data and sensor_data[sensor_type] is not None:
+                    entity_id = f"{device.device_id.lower()}_{sensor_type}"
+                    if entity_id not in [s.unique_id for s in sensors]:
+                        sensors.append(
+                            CresSensorEntity(device, sensor_type, coordinator, entry)
+                        )
 
     # Create sensors for input devices based on configuration
     for input_name, cfg in input_config.items():
