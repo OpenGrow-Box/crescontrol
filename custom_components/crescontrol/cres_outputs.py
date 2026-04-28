@@ -9,9 +9,9 @@ class CresOutputs:
         reqAddr,
         outputList=["a", "b", "c", "d", "e", "f"],
         pwm_devices=["a", "b"],
-        
+        session=None,
     ):
-        self.req = CresRequest(reqAddr)
+        self.req = CresRequest(reqAddr, session)
         self.outputList = outputList
         self.devices = outputList
         self.outputs_data = {}
@@ -27,12 +27,25 @@ class CresOutputs:
                 "threshold": 0,
             }
 
-# Multi Deviec Request 
+# Multi Device Request 
     async def getAllOutputsData(self):
-        """Fetch all output data with a single request for all outputs."""
+        """Fetch all output data in batches of 2 to avoid URI too long."""
+        
+        if not self.outputList:
+            return self.outputs_data
 
+        # Process outputs in batches of 2 to keep URL short
+        batch_size = 2
+        for i in range(0, len(self.outputList), batch_size):
+            batch = self.outputList[i:i + batch_size]
+            await self._fetchOutputBatch(batch)
+
+        return self.outputs_data
+    
+    async def _fetchOutputBatch(self, output_batch):
+        """Fetch data for a batch of outputs."""
         request_parts = []
-        for output_name in self.outputList:
+        for output_name in output_batch:
             request_parts.append(
                 f"out-{output_name}:enabled;out-{output_name}:voltage;out-{output_name}:calib-offset;out-{output_name}:calib-factor;out-{output_name}:threshold"
             )
@@ -41,21 +54,16 @@ class CresOutputs:
                     f"out-{output_name}:pwm-enabled;out-{output_name}:pwm-frequency"
                 )
 
-
         request_string = ";".join(request_parts)
-
-
         response = await self.req._get_request(request_string)
 
-  
         if response is None or "error" in response.lower():
             raise ValueError(f"Error fetching output data: {response}")
 
-    
         try:
             split_response = response.split(";")
             index = 0
-            for output_name in self.outputList:
+            for output_name in output_batch:
                 self.outputs_data[output_name]["enabled"] = str(split_response[index]).strip() == "1"
                 self.outputs_data[output_name]["voltage"] = float(split_response[index + 1])
                 self.outputs_data[output_name]["calibOffset"] = float(split_response[index + 2])
@@ -63,17 +71,13 @@ class CresOutputs:
                 self.outputs_data[output_name]["threshold"] = float(split_response[index + 4])
                 index += 5
                 
-                
                 if output_name in self.isPWM:
                     self.outputs_data[output_name]["pwmEnabled"] = str(split_response[index]).strip() == "1"
                     self.outputs_data[output_name]["pwmFrequency"] = float(split_response[index + 1])
                     index += 2
 
-        except ValueError as e:
-           
+        except (ValueError, IndexError) as e:
             raise ValueError(f"Error parsing output data: {response}") from e
-
-        return self.outputs_data
 
 ## Single Device Request
 

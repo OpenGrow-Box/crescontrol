@@ -1,65 +1,92 @@
 from homeassistant.components.sensor import SensorEntity
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.const import UnitOfTemperature, PERCENTAGE, CONCENTRATION_PARTS_PER_MILLION
-from custom_components.crescontrol.const import DOMAIN
+from custom_components.crescontrol.const import (
+    DOMAIN,
+    CONF_INPUTS,
+    CONF_OUTPUTS,
+    SENSOR_TYPE_NONE,
+    PWM_OUTPUTS,
+)
 import logging
 
 _LOGGER = logging.getLogger(__name__)
 
-SENSOR_TYPES = {
+# Sensor type configurations
+SENSOR_CONFIGS = {
+    "voltage": {"unit": "V", "icon": "mdi:flash", "device_class": "voltage"},
     "temperature": {"unit": UnitOfTemperature.CELSIUS, "icon": "mdi:thermometer", "device_class": "temperature"},
     "humidity": {"unit": PERCENTAGE, "icon": "mdi:water-percent", "device_class": "humidity"},
-    "vpd": {"unit": "kPa", "icon": "mdi:thermometer", "device_class": None},
-    "co2": {"unit": CONCENTRATION_PARTS_PER_MILLION, "icon": "mdi:carbon-dioxide", "device_class": "carbon_dioxide"},
-    "voltage": {"unit": "V", "icon": "mdi:flash", "device_class": None},
+    "pressure": {"unit": "hPa", "icon": "mdi:gauge", "device_class": "pressure"},
+    "co2": {"unit": CONCENTRATION_PARTS_PER_MILLION, "icon": "mdi:molecule-co2", "device_class": "carbon_dioxide"},
+    "ec": {"unit": "mS/cm", "icon": "mdi:water-opacity", "device_class": None},
+    "ph": {"unit": "pH", "icon": "mdi:ph", "device_class": None},
 }
 
 async def async_setup_entry(hass, entry, async_add_entities):
+    """Set up CresControl sensor entities."""
     coordinator = hass.data[DOMAIN][entry.entry_id]["coordinator"]
-    sensors = {}
+    sensors = []
 
-    _LOGGER.debug(f"Starting setup of sensors. Coordinator data: {coordinator.data}")
+    input_config = entry.data.get(CONF_INPUTS, {})
 
-   
+    # Create sensors for built-in sensor devices (temperature, humidity, vpd, co2)
     for device in coordinator.controller.devices:
-        device_id_normalized = device.device_id.lower()
-
-        
         if device.device_type == "sensor":
             _LOGGER.debug(f"Detected sensor device: {device.device_id}")
             for sensor_type in ["temperature", "humidity", "vpd", "co2"]:
-                if sensor_type in device.state:
-                    entity_id = f"{device_id_normalized}_{sensor_type}"
-                    if entity_id not in sensors:
-                        sensors[entity_id] = CresSensorEntity(
-                            device, sensor_type, coordinator, entry
-                        )
+                entity_id = f"{device.device_id.lower()}_{sensor_type}"
+                if entity_id not in [s.unique_id for s in sensors]:
+                    sensors.append(
+                        CresSensorEntity(device, sensor_type, coordinator, entry)
+                    )
 
-       
-        elif device.device_type == "input":
-            _LOGGER.debug(f"Detected input device: {device.device_id}")
-            entity_id = f"{device_id_normalized}_voltage"
-            if entity_id not in sensors:
-                sensors[entity_id] = CresInputVoltageEntity(device, coordinator, entry)
+    # Create sensors for input devices based on configuration
+    for input_name, cfg in input_config.items():
+        configured_type = cfg.get("type", SENSOR_TYPE_NONE)
+        if configured_type == SENSOR_TYPE_NONE:
+            continue
 
-    if not sensors:
-        _LOGGER.error("No sensors found to add to Home Assistant")
+        custom_name = cfg.get("name", f"Input{input_name.upper()}")
 
-    async_add_entities(sensors.values())
-    _LOGGER.debug(f"Sensors added to Home Assistant: {list(sensors.keys())}")
+        _LOGGER.debug(f"Creating sensor for input {input_name} as {configured_type}")
+        sensors.append(
+            CresInputSensorEntity(
+                input_name, configured_type, coordinator, entry, custom_name
+            )
+        )
 
+    # Create status sensors for outputs configured as light or fan
+    output_config = entry.data.get(CONF_OUTPUTS, {})
+    for output_name, cfg in output_config.items():
+        entity_type = cfg.get("type", "")
+        if entity_type in ["light", "fan"]:
+            custom_name = cfg.get("name", f"{entity_type.capitalize()}{output_name.upper()}")
+            sensors.append(
+                CresOutputStatusSensor(
+                    output_name, entity_type, coordinator, entry, custom_name
+                )
+            )
+            _LOGGER.debug(f"Creating status sensor for output {output_name} as {entity_type}")
+
+    async_add_entities(sensors)
+    _LOGGER.info(f"Added {len(sensors)} sensor entities")
 
 
 class CresSensorEntity(CoordinatorEntity, SensorEntity):
+    """Sensor entity for CresControl built-in sensors."""
+
     def __init__(self, device, sensor_type, coordinator, entry):
         super().__init__(coordinator)
         self._device = device
         self._sensor_type = sensor_type
         self._entry = entry
+        normalized_device_id = device.device_id.lower()
+        self._device_id = f"{DOMAIN}_{normalized_device_id}"
 
-        _LOGGER.debug(
-            f"Initialized CresSensorEntity for {self._device.device_id} with type {self._sensor_type}"
-        )
+    @property
+    def available(self) -> bool:
+        return self.coordinator.last_update_success and self.coordinator.data is not None
 
     @property
     def unique_id(self):
@@ -67,102 +94,215 @@ class CresSensorEntity(CoordinatorEntity, SensorEntity):
         return f"crescontrol_sensor_{normalized_device_id}_{self._sensor_type}_{self._entry.entry_id}"
 
     @property
+    def name(self):
+        normalized_device_id = self._device.device_id.lower()
+        return f"{normalized_device_id.capitalize()}_{self._sensor_type.capitalize()}"
+
+    @property
     def device_info(self):
         normalized_device_id = self._device.device_id.lower()
         return {
-            "identifiers": {(DOMAIN, normalized_device_id)},
+            "identifiers": {(DOMAIN, self._device_id)},
             "name": f"{normalized_device_id.capitalize()}",
             "manufacturer": "cre.sience",
             "model": "CresControl Sensor",
             "sw_version": "1.0",
         }
 
+    @property
+    def extra_state_attributes(self):
+        return {
+            "sensor_type": self._sensor_type,
+        }
+
     def _get_state_from_coordinator(self):
-        """Fetch the state from the coordinator data."""
-        
+        if not self.coordinator.data:
+            return None
         sensor_data = self.coordinator.data.get("sensors", {})
         state = sensor_data.get(self._device.device_id, {}).get(self._sensor_type)
-        
         if state is None:
-            _LOGGER.error(
-                f"No state found for sensor {self._device.device_id} of type {self._sensor_type}"
-            )
             return None
-
-        _LOGGER.debug(
-            f"Fetched state {state} from coordinator for sensor {self._device.device_id} of type {self._sensor_type}"
-        )
-        return float(state) if state is not None else None
-
-    @property
-    def name(self):
-        normalized_device_id = self._device.device_id.lower()
-        return f"{normalized_device_id.capitalize()} {self._sensor_type.capitalize()}"
+        try:
+            return float(state)
+        except (ValueError, TypeError):
+            return None
 
     @property
     def state(self):
-        
         return self._get_state_from_coordinator()
 
     @property
     def unit_of_measurement(self):
-        return SENSOR_TYPES[self._sensor_type]["unit"]
-
-    @property
-    def device_class(self):
-        return SENSOR_TYPES[self._sensor_type]["device_class"]
+        if self._sensor_type == "temperature":
+            return UnitOfTemperature.CELSIUS
+        elif self._sensor_type == "humidity":
+            return PERCENTAGE
+        elif self._sensor_type == "co2":
+            return CONCENTRATION_PARTS_PER_MILLION
+        elif self._sensor_type == "vpd":
+            return "kPa"
+        return None
 
     @property
     def icon(self):
-        return SENSOR_TYPES[self._sensor_type]["icon"]
+        icons = {
+            "temperature": "mdi:thermometer",
+            "humidity": "mdi:water-percent",
+            "vpd": "mdi:water",
+            "co2": "mdi:molecule-co2",
+        }
+        return icons.get(self._sensor_type, "mdi:help-circle")
 
-    async def async_update(self):
-        await self.coordinator.async_request_refresh()
-        _LOGGER.debug(
-            f"Updating sensor {self._device.device_id} of type {self._sensor_type}"
-        )
-# Input Voltage Entity
 
-class CresInputVoltageEntity(CoordinatorEntity, SensorEntity):
-    def __init__(self, device, coordinator, entry):
+class CresInputSensorEntity(CoordinatorEntity, SensorEntity):
+    """Sensor entity for CresControl analog inputs."""
+
+    def __init__(self, input_name, sensor_type, coordinator, entry, custom_name=None):
         super().__init__(coordinator)
-        self._device = device
+        self._input_name = input_name
+        self._sensor_type = sensor_type
         self._entry = entry
+        self._config = SENSOR_CONFIGS.get(sensor_type, SENSOR_CONFIGS["voltage"])
+        self._custom_name = custom_name or f"Input{input_name.upper()}"
+        self._device_id = f"{DOMAIN}_input_{input_name}"
+
+    @property
+    def available(self) -> bool:
+        return self.coordinator.last_update_success and self.coordinator.data is not None
 
     @property
     def unique_id(self):
-        normalized_device_id = self._device.device_id.lower()
-        return f"crescontrol_input_{normalized_device_id}_voltage"
+        return f"crescontrol_input_{self._input_name}_{self._sensor_type}_{self._entry.entry_id}"
+
+    @property
+    def name(self):
+        return f"{self._custom_name}{self._sensor_type.capitalize()}"
 
     @property
     def device_info(self):
-        normalized_device_id = self._device.device_id.lower()
         return {
-            "identifiers": {(DOMAIN, f"{DOMAIN}_input_{normalized_device_id}")},
-            "name": f"Input {normalized_device_id.upper()}",
+            "identifiers": {(DOMAIN, self._device_id)},
+            "name": self._custom_name,
             "manufacturer": "cre.sience",
             "model": "CresControl Input",
             "sw_version": "1.0",
         }
 
-    def _get_state_from_coordinator(self):
-        """Fetch the state from the coordinator data."""
+    def _get_raw_voltage(self):
+        if not self.coordinator.data:
+            return 0.0
         input_data = self.coordinator.data.get("inputs", {})
-        state = input_data.get(self._device.device_id, {}).get("voltage")
-        _LOGGER.debug(f"State from coordinator for input {self._device.device_id}, state: {state}")
-        return state
-
-    @property
-    def name(self):
-        normalized_device_id = self._device.device_id.lower()
-        return f"Input {normalized_device_id.upper()} Voltage"
+        voltage = input_data.get(self._input_name, {}).get("voltage", 0)
+        try:
+            return float(voltage)
+        except (ValueError, TypeError):
+            return 0.0
 
     @property
     def state(self):
-        state = self._get_state_from_coordinator()
-        _LOGGER.debug(f"Getting voltage state for {self._device.device_id}, state: {state}")
-        return state
+        voltage = self._get_raw_voltage()
+        # Apply conversion factors based on sensor type
+        conversion_factors = {
+            "voltage": 1.0,
+            "temperature": 10.0,
+            "humidity": 10.0,
+            "pressure": 100.0,
+            "co2": 200.0,
+            "ec": 1.0,
+            "ph": 1.4,
+        }
+        factor = conversion_factors.get(self._sensor_type, 1.0)
+        value = voltage * factor
+        return round(value, 2)
 
     @property
     def unit_of_measurement(self):
-        return "V"
+        return self._config.get("unit", "V")
+
+    @property
+    def device_class(self):
+        return self._config.get("device_class")
+
+    @property
+    def icon(self):
+        return self._config.get("icon", "mdi:flash")
+
+    @property
+    def extra_state_attributes(self):
+        return {
+            "input_channel": self._input_name,
+            "raw_voltage": self._get_raw_voltage(),
+            "sensor_type": self._sensor_type,
+        }
+
+
+class CresOutputStatusSensor(CoordinatorEntity, SensorEntity):
+    """Sensor entity showing current intensity/duty for light/fan outputs."""
+
+    def __init__(self, output_name, entity_type, coordinator, entry, custom_name=None):
+        super().__init__(coordinator)
+        self._output_name = output_name
+        self._entity_type = entity_type
+        self._entry = entry
+        self._custom_name = custom_name or f"{entity_type.capitalize()}{output_name.upper()}"
+        self._device_id = f"{DOMAIN}_output_{output_name}_device"
+
+    @property
+    def available(self) -> bool:
+        return self.coordinator.last_update_success and self.coordinator.data is not None
+
+    @property
+    def unique_id(self):
+        suffix = "intensity" if self._entity_type == "light" else "dutycycle"
+        return f"crescontrol_output_{self._output_name}_{suffix}_{self._entry.entry_id}"
+
+    @property
+    def name(self):
+        if self._entity_type == "light":
+            return "Intensity"
+        else:
+            return "DutyCycle"
+
+    @property
+    def device_info(self):
+        return {
+            "identifiers": {(DOMAIN, self._device_id)},
+            "name": self._custom_name,
+            "manufacturer": "cre.sience",
+            "model": "CresControl Output",
+            "sw_version": "1.0",
+        }
+
+    @property
+    def unit_of_measurement(self):
+        return "%"
+
+    @property
+    def icon(self):
+        if self._entity_type == "light":
+            return "mdi:brightness-6"
+        return "mdi:fan"
+
+    @property
+    def state(self):
+        if not self.coordinator.data:
+            return 0
+        output_data = self.coordinator.data.get("outputs", {}).get(self._output_name, {})
+        voltage = output_data.get("voltage", 0)
+        enabled = output_data.get("enabled", False)
+        
+        if not enabled:
+            return 0
+            
+        try:
+            return min(100, max(0, float(voltage) * 10))
+        except (ValueError, TypeError):
+            return 0
+
+    @property
+    def extra_state_attributes(self):
+        return {
+            "output_channel": self._output_name,
+            "entity_type": self._entity_type,
+            "voltage": self.coordinator.data.get("outputs", {}).get(self._output_name, {}).get("voltage", 0) if self.coordinator.data else 0,
+        }

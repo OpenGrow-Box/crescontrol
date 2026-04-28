@@ -4,8 +4,8 @@ import logging
 _LOGGER = logging.getLogger(__name__)
 
 class CresSwitches:
-    def __init__(self, reqAddr, switchList=["12v", "24v-a", "24v-b"]):
-        self.req = CresRequest(reqAddr)
+    def __init__(self, reqAddr, switchList=["12v", "24v-a", "24v-b"], session=None):
+        self.req = CresRequest(reqAddr, session)
         self.switchList = switchList
         self.devices = switchList
         self.switch_data = {}

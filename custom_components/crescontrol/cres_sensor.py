@@ -5,8 +5,8 @@ _LOGGER = logging.getLogger(__name__)
 
 
 class CresSensors:
-    def __init__(self, reqAddr):
-        self.req = CresRequest(reqAddr)
+    def __init__(self, reqAddr, session=None):
+        self.req = CresRequest(reqAddr, session)
         self.sensors = []
         self.sensor_data = {} 
 
@@ -35,30 +35,27 @@ class CresSensors:
                 )
 
     async def fetch_all_sensor_data(self, sensor_id):
-        """Fetch all data for a specific sensor in a single API request."""
+        """Fetch all data for a specific sensor in a single batched request."""
         sensor_state = {}
         try:
+            # Build batched request for all parameters at once
+            params = ["humidity", "temperature", "vpd"]
+            if "co2" in sensor_id.lower():
+                params.append("co2-concentration")
 
-            response = await self.req._get_request(
-                f"extension:{sensor_id}:humidity;extension:{sensor_id}:temperature;extension:{sensor_id}:vpd"
-                + (f";extension:{sensor_id}:co2-concentration" if "co2" in sensor_id.lower() else "")
-            )
+            request_parts = [f"extension:{sensor_id}:{param}" for param in params]
+            request_string = ";".join(request_parts)
 
+            response = await self.req._get_request(request_string)
 
-            values = response.split(";")
-            humidity, temperature, vpd = values[0], values[1], values[2]
-
-            if humidity:
-                sensor_state["humidity"] = float(humidity)
-            if temperature:
-                sensor_state["temperature"] = float(temperature)
-            if vpd:
-                sensor_state["vpd"] = float(vpd)
-
-            if "co2" in sensor_id.lower() and len(values) > 3:
-                co2 = values[3]
-                if co2:
-                    sensor_state["co2"] = float(co2)
+            if response and response.strip():
+                values = response.strip().split(";")
+                for i, param in enumerate(params):
+                    if i < len(values) and values[i].strip():
+                        try:
+                            sensor_state[param.replace("-concentration", "")] = float(values[i].strip())
+                        except (ValueError, TypeError):
+                            _LOGGER.debug(f"Could not parse {param} for sensor {sensor_id}: '{values[i]}'")
 
         except Exception as e:
             _LOGGER.error(

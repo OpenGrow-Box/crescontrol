@@ -6,8 +6,8 @@ _LOGGER = logging.getLogger(__name__)
 
 
 class CresSystem:
-    def __init__(self, reqAddr):
-        self.req = CresRequest(reqAddr)
+    def __init__(self, reqAddr, session=None):
+        self.req = CresRequest(reqAddr, session)
         self.cpuID = ""
         self.type = ""
         self.resetCause = ""

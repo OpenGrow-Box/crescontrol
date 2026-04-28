@@ -2,8 +2,8 @@ from custom_components.crescontrol.cres_req import CresRequest
 
 
 class CresFan:
-    def __init__(self, reqAddr):
-        self.req = CresRequest(reqAddr)
+    def __init__(self, reqAddr, session=None):
+        self.req = CresRequest(reqAddr, session)
         self.enabled: bool = False
         self.duty_cycle: float = 0.0  
         self.min_duty_cycle: float = 0.0 

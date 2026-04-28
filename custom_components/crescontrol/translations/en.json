@@ -3,14 +3,38 @@
         "step": {
             "user": {
                 "title": "Connect to CresControl",
-                "description": "Please enter the host IP address to connect to your CresControl device.",
+                "description": "Enter the IP address of your CresControl device.\n\nExample: 192.168.1.100 or crescontrol.local",
                 "data": {
-                    "host": "Host IP address"
+                    "host": "IP Address"
                 }
+            },
+            "outputs": {
+                "title": "Configure Outputs",
+                "description": "Configure the 6 analog outputs (A-F). Outputs A and B support PWM dimming.\n\nSelect type and name for each output."
+            },
+            "switches": {
+                "title": "Configure Switches",
+                "description": "Configure the 3 switch outputs (12V, 24V-A, 24V-B).\n\nSelect type and name for each switch."
+            },
+            "inputs": {
+                "title": "Configure Inputs",
+                "description": "Configure the 2 analog inputs (A-B) as sensors.\n\nSelect sensor type and name for each input."
+            },
+            "fan": {
+                "title": "Configure Fan",
+                "description": "Configure the built-in PWM fan output.\n\nEnable the fan if you want to use it."
             }
         },
         "error": {
             "cannot_connect": "Failed to connect to the device. Please check the IP address and try again."
+        }
+    },
+    "options": {
+        "step": {
+            "init": {
+                "title": "CresControl Settings",
+                "description": "Adjust the device configuration."
+            }
         }
     }
 }

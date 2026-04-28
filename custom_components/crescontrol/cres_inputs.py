@@ -2,8 +2,8 @@ from custom_components.crescontrol.cres_req import CresRequest
 
 
 class CresInputs:
-    def __init__(self, reqAddr, inputList=["a", "b"]):
-        self.req = CresRequest(reqAddr)
+    def __init__(self, reqAddr, inputList=["a", "b"], session=None):
+        self.req = CresRequest(reqAddr, session)
         self.inputList = inputList
         self.inputs_data = {}
         self.devices = ["a", "b"]

@@ -3,14 +3,38 @@
         "step": {
             "user": {
                 "title": "Mit CresControl verbinden",
-                "description": "Bitte geben Sie die Host-IP-Adresse ein, um eine Verbindung zu Ihrem CresControl-Gerät herzustellen.",
+                "description": "Geben Sie die IP-Adresse Ihres CresControl-Geräts ein.\n\nBeispiel: 192.168.1.100 oder crescontrol.local",
                 "data": {
-                    "host": "Host-IP-Adresse"
+                    "host": "IP-Adresse"
                 }
+            },
+            "outputs": {
+                "title": "Ausgänge konfigurieren",
+                "description": "Konfigurieren Sie die 6 analogen Ausgänge (A-F). Ausgänge A und B unterstützen PWM-Dimming.\n\nWählen Sie den Typ und Namen für jeden Ausgang."
+            },
+            "switches": {
+                "title": "Schalter konfigurieren",
+                "description": "Konfigurieren Sie die 3 Schaltausgänge (12V, 24V-A, 24V-B).\n\nWählen Sie den Typ und Namen für jeden Schalter."
+            },
+            "inputs": {
+                "title": "Eingänge konfigurieren",
+                "description": "Konfigurieren Sie die 2 analogen Eingänge (A-B) als Sensoren.\n\nWählen Sie den Sensortyp und Namen für jeden Eingang."
+            },
+            "fan": {
+                "title": "Lüfter konfigurieren",
+                "description": "Konfigurieren Sie den integrierten PWM-Lüfterausgang.\n\nAktivieren Sie den Lüfter, wenn Sie ihn nutzen möchten."
             }
         },
         "error": {
             "cannot_connect": "Verbindung zum Gerät fehlgeschlagen. Bitte überprüfen Sie die IP-Adresse und versuchen Sie es erneut."
+        }
+    },
+    "options": {
+        "step": {
+            "init": {
+                "title": "CresControl Einstellungen",
+                "description": "Passen Sie die Gerätekonfiguration an."
+            }
         }
     }
 }
