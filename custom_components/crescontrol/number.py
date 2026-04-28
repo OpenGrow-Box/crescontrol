@@ -113,7 +113,7 @@ def safe_float_conversion(value, entity_name, attribute_name):
             return 0.0
 
         float_value = float(value)
-        if attribute_name in ["Voltage"] and not (0 <= float_value <= 10):
+        if attribute_name == "Voltage" and not (0 <= float_value <= 10):
             _LOGGER.warning(
                 f"Value out of range for {entity_name} {attribute_name}: '{value}'. Expected range 0-10."
             )

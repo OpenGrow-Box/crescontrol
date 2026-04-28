@@ -12,7 +12,7 @@ from custom_components.crescontrol.const import (
     CONF_FAN,
 )
 from custom_components.crescontrol.cres_control import CresControl
-from custom_components.crescontrol.coordinator import ExampleCoordinator
+from custom_components.crescontrol.coordinator import CresControlCoordinator
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -47,7 +47,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             await control.async_close()
             return False
 
-        coordinator = ExampleCoordinator(hass, entry, control)
+        coordinator = CresControlCoordinator(hass, entry, control)
 
         hass.data.setdefault(DOMAIN, {})[entry.entry_id] = {
             "control": control,

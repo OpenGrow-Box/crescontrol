@@ -105,7 +105,7 @@ class CresOutputSwitchEntity(CoordinatorEntity, SwitchEntity):
 
     async def async_turn_on(self, **kwargs):
         # Enable PWM for PWM-capable outputs (A, B)
-        if self._output_name in ["a", "b"]:
+        if self._output_name in PWM_OUTPUTS:
             await self.coordinator.controller.outputs.set_output_pwm_enabled(
                 self._output_name, True
             )

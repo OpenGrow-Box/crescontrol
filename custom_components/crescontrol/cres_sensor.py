@@ -32,7 +32,7 @@ class CresSensors:
 
             except Exception as e:
                 _LOGGER.error(
-                    f"Fehler beim Abrufen oder Verarbeiten der Sensordaten für Sensor {sensor_id}: {e}"
+                    f"Error fetching or processing sensor data for sensor {sensor_id}: {e}"
                 )
 
     async def fetch_all_sensor_data(self, sensor_id):
@@ -60,7 +60,7 @@ class CresSensors:
 
         except Exception as e:
             _LOGGER.error(
-                f"Fehler beim Abrufen oder Verarbeiten der Sensordaten für Sensor {sensor_id}: {e}"
+                f"Error fetching or processing sensor data for sensor {sensor_id}: {e}"
             )
 
         return sensor_state

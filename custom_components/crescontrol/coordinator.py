@@ -11,7 +11,7 @@ from custom_components.crescontrol.const import DEFAULT_SCAN_INTERVAL, DOMAIN
 _LOGGER = logging.getLogger(__name__)
 
 
-class ExampleCoordinator(DataUpdateCoordinator):
+class CresControlCoordinator(DataUpdateCoordinator):
     """Coordinator to manage the integration with the CresControl system."""
 
     def __init__(self, hass: HomeAssistant, config_entry: ConfigEntry, controller: CresControl) -> None:
@@ -63,19 +63,19 @@ class ExampleCoordinator(DataUpdateCoordinator):
         try:
             _LOGGER.debug(f"Updating device {device_id} from API")
 
-            # Finde das entsprechende Gerät und aktualisiere es gezielt
+            # Find the corresponding device and update it specifically
             device = self.controller.get_device_by_id(device_id)
             if device:
                 if device.device_type == DeviceType.SENSOR:
-                    await self.controller.update_sensors()  # Aktualisiere alle Sensoren
+                    await self.controller.update_sensors()  # Update all sensors
                 elif device.device_type == DeviceType.FAN:
-                    await self.controller.update_fan()  # Aktualisiere den Lüfter
+                    await self.controller.update_fan()  # Update fan
                 elif device.device_type == DeviceType.INPUT:
-                    await self.controller.update_inputs()  # Aktualisiere alle Eingaben
+                    await self.controller.update_inputs()  # Update all inputs
                 elif device.device_type == DeviceType.OUTPUT:
-                    await self.controller.update_outputs()  # Aktualisiere alle Ausgaben
+                    await self.controller.update_outputs()  # Update all outputs
                 elif device.device_type == DeviceType.SWITCH:
-                    await self.controller.update_switches()  # Aktualisiere alle Schalter
+                    await self.controller.update_switches()  # Update all switches
                 else:
                     _LOGGER.warning(f"Device type {device.device_type} not recognized")
                 return {device.device_id: device.state}

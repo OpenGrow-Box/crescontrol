@@ -69,6 +69,7 @@ class CresControlConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 errors=errors,
             )
 
+        control = None
         try:
             control = CresControl(host)
             connection_successful = await control.test_connection()
@@ -92,6 +93,9 @@ class CresControlConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 data_schema=vol.Schema({vol.Required(CONF_HOST): str}),
                 errors=errors,
             )
+        finally:
+            if control:
+                await control.async_close()
 
     async def async_step_outputs(self, user_input=None):
         """Handle output configuration step."""
@@ -239,6 +243,7 @@ class CresControlOptionsFlowHandler(config_entries.OptionsFlow):
     async def async_step_init(self, user_input=None):
         """Handle options flow."""
         if user_input is not None:
+            new_options = {}
             new_data = dict(self.config_entry.data)
 
             # Parse outputs
@@ -299,7 +304,11 @@ class CresControlOptionsFlowHandler(config_entries.OptionsFlow):
             new_data[CONF_INPUTS] = input_config
             new_data[CONF_FAN] = fan_config
 
-            self.hass.config_entries.async_update_entry(self.config_entry, data=new_data)
+            self.hass.config_entries.async_update_entry(
+                self.config_entry, data=new_data, options=new_options
+            )
+            # Reload the config entry to apply changes
+            await self.hass.config_entries.async_reload(self.config_entry.entry_id)
             return self.async_create_entry(title="", data={})
 
         # Build schema with current values

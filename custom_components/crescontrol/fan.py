@@ -125,7 +125,11 @@ class CresFanEntity(CoordinatorEntity, FanEntity):
     async def async_turn_on(self, percentage=None, preset_mode=None, **kwargs):
         _LOGGER.debug(f"Turning on fan with percentage {percentage}")
         if percentage is None:
-            minduty = await self.coordinator.controller.fan.getFanDutyCycleMin()
+            # Use cached min duty cycle from coordinator data if available
+            fan_data = self.coordinator.data.get("fan", {}) if self.coordinator.data else {}
+            minduty = fan_data.get("minDutyCycle", 0)
+            if minduty == 0:
+                minduty = await self.coordinator.controller.fan.getFanDutyCycleMin()
             await self.coordinator.controller.fan.setFanEnabled(True)
             await self.coordinator.controller.fan.setFanDutyCycle(float(minduty))
         else:
@@ -195,11 +199,15 @@ class CresOutputFanEntity(CoordinatorEntity, FanEntity):
 
     @property
     def is_on(self):
+        if not self.coordinator.data:
+            return False
         output_data = self.coordinator.data.get("outputs", {}).get(self._output_name, {})
         return output_data.get("enabled", False)
 
     @property
     def percentage(self):
+        if not self.coordinator.data:
+            return 0
         if not self._is_pwm:
             return 100 if self.is_on else 0
 
@@ -307,11 +315,15 @@ class CresSwitchFanEntity(CoordinatorEntity, FanEntity):
 
     @property
     def is_on(self):
+        if not self.coordinator.data:
+            return False
         switch_data = self.coordinator.data.get("switches", {}).get(self._switch_name, {})
         return switch_data.get("enabled", False)
 
     @property
     def percentage(self):
+        if not self.coordinator.data:
+            return 0
         switch_data = self.coordinator.data.get("switches", {}).get(self._switch_name, {})
         duty_cycle = switch_data.get("duty-cycle", 0)
         try:

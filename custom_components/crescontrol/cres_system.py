@@ -72,7 +72,7 @@ class CresSystem:
             self.type = await self.req._get_request("type")
             return self.type if self.type else None
         except Exception as e:
-            _LOGGER.error(f"Kein Type Gefunden {e}")
+            _LOGGER.error(f"No type found: {e}")
             return None
 
     async def RebootSystem(self):
