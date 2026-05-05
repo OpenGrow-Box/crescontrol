@@ -22,21 +22,30 @@ class CresSensors:
         return self.sensors
 
     async def update_sensor_data(self):
-        """Update sensor data by fetching all relevant data in one pass."""
-        self.sensor_data = {}  
-
+        """Update sensor data by fetching all relevant data in one pass.
+        
+        Failed sensors keep their previous data to avoid all entities going unavailable.
+        """
         for sensor_id in self.sensors:
             try:
                 sensor_state = await self.fetch_all_sensor_data(sensor_id)
-                self.sensor_data[sensor_id] = sensor_state
+                if sensor_state:
+                    self.sensor_data[sensor_id] = sensor_state
+                else:
+                    _LOGGER.warning(
+                        f"Sensor {sensor_id} returned no data, keeping previous values"
+                    )
 
             except Exception as e:
-                _LOGGER.error(
-                    f"Error fetching or processing sensor data for sensor {sensor_id}: {e}"
+                _LOGGER.warning(
+                    f"Sensor {sensor_id} temporarily unavailable, keeping previous values: {e}"
                 )
 
     async def fetch_all_sensor_data(self, sensor_id):
-        """Fetch all data for a specific sensor in a single batched request."""
+        """Fetch all data for a specific sensor in a single batched request.
+        
+        Returns empty dict on failure to allow graceful degradation.
+        """
         sensor_state = {}
         try:
             # Build batched request for all parameters at once
@@ -59,8 +68,8 @@ class CresSensors:
                             _LOGGER.debug(f"Could not parse {param} for sensor {sensor_id}: '{values[i]}'")
 
         except Exception as e:
-            _LOGGER.error(
-                f"Error fetching or processing sensor data for sensor {sensor_id}: {e}"
+            _LOGGER.warning(
+                f"Sensor {sensor_id} fetch failed, returning empty state: {e}"
             )
 
         return sensor_state

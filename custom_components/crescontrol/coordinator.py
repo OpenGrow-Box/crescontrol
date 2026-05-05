@@ -28,13 +28,25 @@ class CresControlCoordinator(DataUpdateCoordinator):
         )
 
     async def async_update_data(self):
-        """Fetch data from the API endpoint."""
+        """Fetch data from the API endpoint.
+        
+        On partial failure, returns previously cached data if available
+        to avoid all entities going unavailable.
+        """
         try:
             _LOGGER.debug("Updating CresControl data from API")
 
             # Initialize devices only if they haven't been initialized
             if not self.controller._initialized:
-                await self.controller.init_devices()
+                try:
+                    await self.controller.init_devices()
+                except Exception as init_err:
+                    _LOGGER.warning(f"Device initialization failed: {init_err}")
+                    # If we have cached data, keep using it
+                    if self.data:
+                        _LOGGER.info("Using cached data due to initialization failure")
+                        return self.data
+                    raise
 
             # Update all devices with consolidated requests
             await self.controller.update_all()
@@ -54,8 +66,18 @@ class CresControlCoordinator(DataUpdateCoordinator):
         except APIAuthError as err:
             _LOGGER.error("API Auth Error: %s", err)
             raise UpdateFailed("Authentication Error") from err
+        except UpdateFailed:
+            # If update failed but we have cached data, keep using it
+            if self.data:
+                _LOGGER.warning("Update failed, keeping previously cached data")
+                return self.data
+            raise
         except Exception as err:
             _LOGGER.error("Error communicating with API: %s", err)
+            # If we have cached data, keep using it instead of making all entities unavailable
+            if self.data:
+                _LOGGER.warning("Using cached data due to communication error")
+                return self.data
             raise UpdateFailed("Error communicating with API") from err
 
     async def async_update_single_device(self, device_id: str):

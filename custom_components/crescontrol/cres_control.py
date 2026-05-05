@@ -64,12 +64,16 @@ class CresControl:
         self.fan_enabled = fan_enabled
 
     async def init_devices(self):
-        """Initialize all devices atomically. On failure, devices list is cleared."""
+        """Initialize all devices. Each subsystem is initialized independently.
+        
+        Failed subsystems are skipped so that working subsystems are still available.
+        """
         # Clear previous state to prevent duplicates on re-initialization
         self.devices = []
+        init_errors = []
         
+        # Sensors Initialization - always available
         try:
-            # Sensors Initialization - always available
             await self.sensors.get_sensors()  
             await self.sensors.update_sensor_data() 
 
@@ -84,9 +88,13 @@ class CresControl:
                         state=sensor_state,
                     )
                 )
+        except Exception as e:
+            _LOGGER.warning(f"Sensor initialization failed: {e}")
+            init_errors.append(("sensors", e))
 
-            # Initialize Fan only if enabled
-            if self.fan_enabled:
+        # Initialize Fan only if enabled
+        if self.fan_enabled:
+            try:
                 await self.fan.getAllFanData()
                 self.fan_data = {
                     "enabled": self.fan.enabled,
@@ -104,9 +112,13 @@ class CresControl:
                         state=self.fan_data,
                     )
                     self.devices.append(fan_device)
+            except Exception as e:
+                _LOGGER.warning(f"Fan initialization failed: {e}")
+                init_errors.append(("fan", e))
 
-            # Initialize Outputs - only active ones
-            if self.outputs.outputList:
+        # Initialize Outputs - only active ones
+        if self.outputs.outputList:
+            try:
                 self.outputs_data = await self.outputs.getAllOutputsData()
                 for output_name, output_state in self.outputs_data.items():
                     self.devices.append(
@@ -118,9 +130,13 @@ class CresControl:
                             state=output_state,
                         )
                     )
+            except Exception as e:
+                _LOGGER.warning(f"Outputs initialization failed: {e}")
+                init_errors.append(("outputs", e))
 
-            # Initialize Inputs - only active ones
-            if self.inputs.inputList:
+        # Initialize Inputs - only active ones
+        if self.inputs.inputList:
+            try:
                 await self.inputs.getAllInputsData()
                 for input_name, input_state in self.inputs.inputs_data.items():
                     self.devices.append(
@@ -132,9 +148,13 @@ class CresControl:
                             state=input_state,
                         )
                     )
+            except Exception as e:
+                _LOGGER.warning(f"Inputs initialization failed: {e}")
+                init_errors.append(("inputs", e))
 
-            # Initialize Switches - only active ones
-            if self.switches.switchList:
+        # Initialize Switches - only active ones
+        if self.switches.switchList:
+            try:
                 await self.switches.getAllSwitchData()
                 for switch_name, switch_state in self.switches.switch_data.items():
                     self.devices.append(
@@ -146,13 +166,19 @@ class CresControl:
                             state=switch_state,
                         )
                     )
-            
+            except Exception as e:
+                _LOGGER.warning(f"Switches initialization failed: {e}")
+                init_errors.append(("switches", e))
+        
+        # Mark as initialized if at least some devices were created
+        if self.devices:
             self._initialized = True
-            
-        except Exception:
-            # On failure, clear devices so next refresh will retry
-            self.devices = []
-            raise
+            if init_errors:
+                _LOGGER.info(f"Partial initialization: {len(self.devices)} devices initialized, {len(init_errors)} subsystems failed")
+        elif init_errors:
+            # Only raise if nothing could be initialized
+            _LOGGER.error(f"All subsystems failed to initialize: {init_errors}")
+            raise UpdateFailed(f"All {len(init_errors)} subsystems failed to initialize") from init_errors[0][1]
 
     def get_device_by_id(self, device_id):
         for device in self.devices:
@@ -161,70 +187,102 @@ class CresControl:
         return None
 
     async def update_sensors(self):
-        await self.sensors.update_sensor_data()
-        # Build sanitized sensor data mapping
-        sanitized_sensor_data = {}
-        for raw_id, data in self.sensors.sensor_data.items():
-            sanitized_id = sanitize_sensor_id(raw_id)
-            sanitized_sensor_data[sanitized_id] = data
-        
-        for device in self.devices:
-            if device.device_type == DeviceType.SENSOR:
-                sensor_id = device.device_id
-                device.state = sanitized_sensor_data.get(sensor_id, {})
+        try:
+            await self.sensors.update_sensor_data()
+            # Build sanitized sensor data mapping
+            sanitized_sensor_data = {}
+            for raw_id, data in self.sensors.sensor_data.items():
+                sanitized_id = sanitize_sensor_id(raw_id)
+                sanitized_sensor_data[sanitized_id] = data
+            
+            for device in self.devices:
+                if device.device_type == DeviceType.SENSOR:
+                    sensor_id = device.device_id
+                    device.state = sanitized_sensor_data.get(sensor_id, {})
+        except Exception as e:
+            _LOGGER.warning(f"Sensors update failed, keeping previous state: {e}")
+            raise
 
     async def update_fan(self):
         if not self.fan_enabled:
             return
-        await self.fan.getAllFanData()
-        self.fan_data = {
-            "enabled": self.fan.enabled,
-            "dutyCycle": self.fan.duty_cycle,
-            "minDutyCycle": self.fan.min_duty_cycle,
-        }
-        fan_device = self.get_device_by_id("fan")
-        if fan_device:
-            fan_device.state = self.fan_data.copy()
+        try:
+            await self.fan.getAllFanData()
+            self.fan_data = {
+                "enabled": self.fan.enabled,
+                "dutyCycle": self.fan.duty_cycle,
+                "minDutyCycle": self.fan.min_duty_cycle,
+            }
+            fan_device = self.get_device_by_id("fan")
+            if fan_device:
+                fan_device.state = self.fan_data.copy()
+        except Exception as e:
+            _LOGGER.warning(f"Fan update failed, keeping previous state: {e}")
+            raise
 
     async def update_inputs(self):
         if not self.inputs.inputList:
             return
-        await self.inputs.getAllInputsData() 
-        for device in self.devices:
-            if device.device_type == DeviceType.INPUT:
-                device.state = self.inputs.inputs_data.get(device.device_id, {}).copy()
+        try:
+            await self.inputs.getAllInputsData() 
+            for device in self.devices:
+                if device.device_type == DeviceType.INPUT:
+                    device.state = self.inputs.inputs_data.get(device.device_id, {}).copy()
+        except Exception as e:
+            _LOGGER.warning(f"Inputs update failed, keeping previous state: {e}")
+            raise
 
     async def update_outputs(self):
         if not self.outputs.outputList:
             return
-        self.outputs_data = await self.outputs.getAllOutputsData()
-        for device in self.devices:
-            if device.device_type == DeviceType.OUTPUT:
-                device.state = self.outputs_data.get(device.device_id, {}).copy()
+        try:
+            self.outputs_data = await self.outputs.getAllOutputsData()
+            for device in self.devices:
+                if device.device_type == DeviceType.OUTPUT:
+                    device.state = self.outputs_data.get(device.device_id, {}).copy()
+        except Exception as e:
+            _LOGGER.warning(f"Outputs update failed, keeping previous state: {e}")
+            raise
 
     async def update_switches(self):
         if not self.switches.switchList:
             return
-        await self.switches.getAllSwitchData()
-        for device in self.devices:
-            if device.device_type == DeviceType.SWITCH:
-                device.state = self.switches.switch_data.get(device.device_id, {}).copy()
+        try:
+            await self.switches.getAllSwitchData()
+            for device in self.devices:
+                if device.device_type == DeviceType.SWITCH:
+                    device.state = self.switches.switch_data.get(device.device_id, {}).copy()
+        except Exception as e:
+            _LOGGER.warning(f"Switches update failed, keeping previous state: {e}")
+            raise
 
     async def update_all(self):
-        """Update all device data. Runs updates concurrently but propagates exceptions."""
-        results = await asyncio.gather(
-            self.update_sensors(),
-            self.update_fan(),
-            self.update_inputs(),
-            self.update_outputs(),
-            self.update_switches(),
-            return_exceptions=True,
-        )
-        # Check if any update failed and raise the first exception
-        errors = [r for r in results if isinstance(r, Exception)]
-        if errors:
-            _LOGGER.error(f"Update failed for {len(errors)} subsystems: {errors}")
-            raise UpdateFailed(f"Failed to update {len(errors)} subsystems") from errors[0]
+        """Update all device data. Each subsystem is updated independently.
+        
+        Failed subsystems are logged but do not cause other subsystems to fail.
+        Only raises if ALL subsystems fail.
+        """
+        updates = [
+            ("sensors", self.update_sensors),
+            ("fan", self.update_fan),
+            ("inputs", self.update_inputs),
+            ("outputs", self.update_outputs),
+            ("switches", self.update_switches),
+        ]
+        
+        errors = []
+        for name, update_func in updates:
+            try:
+                await update_func()
+            except Exception as e:
+                _LOGGER.warning(f"Subsystem '{name}' update failed: {e}")
+                errors.append((name, e))
+        
+        if len(errors) == len(updates):
+            _LOGGER.error(f"All {len(updates)} subsystems failed to update")
+            raise UpdateFailed(f"All {len(updates)} subsystems failed") from errors[0][1]
+        elif errors:
+            _LOGGER.info(f"Partial update completed: {len(updates) - len(errors)}/{len(updates)} subsystems OK")
 
     async def fetch_sensor_data(self, sensor_id):
         return self.sensors.sensor_data.get(sensor_id, {})

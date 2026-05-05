@@ -11,14 +11,14 @@ _GLOBAL_REQUEST_LOCK = asyncio.Lock()
 
 # Maximum URL length to prevent 414 errors
 MAX_URL_LENGTH = 1800
-# Request timeout in seconds
-REQUEST_TIMEOUT = 10
+# Request timeout in seconds (increased for embedded devices)
+REQUEST_TIMEOUT = 15
 # Number of retries for failed requests
 MAX_RETRIES = 3
 # Delay between retries in seconds
 RETRY_DELAY = 1
 # Delay between requests to avoid overwhelming the device
-REQUEST_DELAY = 0.1
+REQUEST_DELAY = 0.5
 
 
 class CresRequestError(Exception):
@@ -54,7 +54,20 @@ class CresRequest:
     async def _get_session(self) -> aiohttp.ClientSession:
         """Get or create an aiohttp session."""
         if self._session is None or self._session.closed:
-            self._session = aiohttp.ClientSession(timeout=self._timeout)
+            # Use a TCP connector optimized for embedded devices:
+            # - limit=1: only one connection at a time to avoid overwhelming the device
+            # - enable_cleanup_closed: clean up closed connections to avoid stale sockets
+            # - force_close=True: close connections after each request to avoid connection pool issues
+            connector = aiohttp.TCPConnector(
+                limit=1,
+                limit_per_host=1,
+                enable_cleanup_closed=True,
+                force_close=True,
+            )
+            self._session = aiohttp.ClientSession(
+                timeout=self._timeout,
+                connector=connector,
+            )
         return self._session
 
     async def close(self):
