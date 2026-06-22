@@ -156,7 +156,9 @@ class CresOutputManualNumber(CoordinatorEntity, NumberEntity):
 
     @property
     def available(self) -> bool:
-        return self.coordinator.last_update_success and self.coordinator.data is not None
+        return (self.coordinator.last_update_success
+                and self.coordinator.data is not None
+                and "outputs" not in self.coordinator.subsystem_failures)
 
     @property
     def unique_id(self):
@@ -237,7 +239,9 @@ class CresSwitchManualNumber(CoordinatorEntity, NumberEntity):
 
     @property
     def available(self) -> bool:
-        return self.coordinator.last_update_success and self.coordinator.data is not None
+        return (self.coordinator.last_update_success
+                and self.coordinator.data is not None
+                and "switches" not in self.coordinator.subsystem_failures)
 
     @property
     def unique_id(self):
@@ -306,7 +310,9 @@ class CresFanMinDutyCycleNumber(CoordinatorEntity, NumberEntity):
 
     @property
     def available(self) -> bool:
-        return self.coordinator.last_update_success and self.coordinator.data is not None
+        return (self.coordinator.last_update_success
+                and self.coordinator.data is not None
+                and "fan" not in self.coordinator.subsystem_failures)
 
     @property
     def name(self):
@@ -376,7 +382,9 @@ class CresInputCalibOffsetNumber(CoordinatorEntity, NumberEntity):
 
     @property
     def available(self) -> bool:
-        return self.coordinator.last_update_success and self.coordinator.data is not None
+        return (self.coordinator.last_update_success
+                and self.coordinator.data is not None
+                and "inputs" not in self.coordinator.subsystem_failures)
 
     @property
     def name(self):
@@ -447,7 +455,9 @@ class CresInputCalibFactorNumber(CoordinatorEntity, NumberEntity):
 
     @property
     def available(self) -> bool:
-        return self.coordinator.last_update_success and self.coordinator.data is not None
+        return (self.coordinator.last_update_success
+                and self.coordinator.data is not None
+                and "inputs" not in self.coordinator.subsystem_failures)
 
     @property
     def name(self):
@@ -518,7 +528,6 @@ class CresOutputVoltageNumber(CoordinatorEntity, NumberEntity):
         output_data = self.coordinator.data.get("outputs", {}).get(self._output_name, {})
         raw_value = output_data.get("voltage", 0)
         voltage = safe_float_conversion(raw_value, f"Output {self._output_name}", "Voltage")
-        # Convert voltage to percentage for light/fan
         if self._is_percentage:
             self._attr_native_value = min(100, max(0, voltage * 10))
         else:
@@ -526,7 +535,9 @@ class CresOutputVoltageNumber(CoordinatorEntity, NumberEntity):
 
     @property
     def available(self) -> bool:
-        return self.coordinator.last_update_success and self.coordinator.data is not None
+        return (self.coordinator.last_update_success
+                and self.coordinator.data is not None
+                and "outputs" not in self.coordinator.subsystem_failures)
 
     @property
     def name(self):
@@ -605,7 +616,9 @@ class CresOutputCalibOffsetNumber(CoordinatorEntity, NumberEntity):
 
     @property
     def available(self) -> bool:
-        return self.coordinator.last_update_success and self.coordinator.data is not None
+        return (self.coordinator.last_update_success
+                and self.coordinator.data is not None
+                and "outputs" not in self.coordinator.subsystem_failures)
 
     @property
     def name(self):
@@ -676,7 +689,9 @@ class CresOutputCalibFactorNumber(CoordinatorEntity, NumberEntity):
 
     @property
     def available(self) -> bool:
-        return self.coordinator.last_update_success and self.coordinator.data is not None
+        return (self.coordinator.last_update_success
+                and self.coordinator.data is not None
+                and "outputs" not in self.coordinator.subsystem_failures)
 
     @property
     def name(self):
@@ -747,7 +762,9 @@ class CresOutputThresholdNumber(CoordinatorEntity, NumberEntity):
 
     @property
     def available(self) -> bool:
-        return self.coordinator.last_update_success and self.coordinator.data is not None
+        return (self.coordinator.last_update_success
+                and self.coordinator.data is not None
+                and "outputs" not in self.coordinator.subsystem_failures)
 
     @property
     def name(self):
@@ -814,7 +831,6 @@ class CresOutputPWMFrequencyNumber(CoordinatorEntity, NumberEntity):
         output_data = self.coordinator.data.get("outputs", {}).get(self._output_name, {})
         raw_value = output_data.get("pwmFrequency", 0)
         converted_value = safe_float_conversion(raw_value, f"Output {self._output_name}", "PWM Frequency")
-        # Return 0 if PWM is not configured yet (device returns 0)
         if converted_value <= 0:
             self._attr_native_value = 0
         else:
@@ -822,7 +838,9 @@ class CresOutputPWMFrequencyNumber(CoordinatorEntity, NumberEntity):
 
     @property
     def available(self) -> bool:
-        return self.coordinator.last_update_success and self.coordinator.data is not None
+        return (self.coordinator.last_update_success
+                and self.coordinator.data is not None
+                and "outputs" not in self.coordinator.subsystem_failures)
 
     @property
     def name(self):
@@ -894,7 +912,9 @@ class CresSwitchDutyCycleNumber(CoordinatorEntity, NumberEntity):
 
     @property
     def available(self) -> bool:
-        return self.coordinator.last_update_success and self.coordinator.data is not None
+        return (self.coordinator.last_update_success
+                and self.coordinator.data is not None
+                and "switches" not in self.coordinator.subsystem_failures)
 
     @property
     def name(self):
@@ -962,7 +982,6 @@ class CresSwitchPWMFrequencyNumber(CoordinatorEntity, NumberEntity):
         switch_data = self.coordinator.data.get("switches", {}).get(self._switch_name, {})
         raw_value = switch_data.get("pwm-frequency", 0)
         converted_value = safe_float_conversion(raw_value, f"Switch {self._switch_name}", "PWM Frequency")
-        # Return 0 if PWM is not configured yet (device returns 0)
         if converted_value <= 0:
             self._attr_native_value = 0
         else:
@@ -970,7 +989,9 @@ class CresSwitchPWMFrequencyNumber(CoordinatorEntity, NumberEntity):
 
     @property
     def available(self) -> bool:
-        return self.coordinator.last_update_success and self.coordinator.data is not None
+        return (self.coordinator.last_update_success
+                and self.coordinator.data is not None
+                and "switches" not in self.coordinator.subsystem_failures)
 
     @property
     def name(self):

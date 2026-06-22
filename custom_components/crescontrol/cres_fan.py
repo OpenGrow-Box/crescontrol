@@ -17,7 +17,7 @@ class CresFan:
         )
 
        
-        if response is None or (isinstance(response, str) and "error" in response.lower()):
+        if response is None or (isinstance(response, str) and (not response.strip() or response.lower().startswith("error"))):
             raise ValueError(f"Error fetching fan data: {response}")
 
         
@@ -48,7 +48,7 @@ class CresFan:
         )
 
 
-        if response is None or (isinstance(response, str) and "error" in response.lower()):
+        if response is None or (isinstance(response, str) and (not response.strip() or response.lower().startswith("error"))):
             raise ValueError(f"Error setting fan data: {response}")
         
 

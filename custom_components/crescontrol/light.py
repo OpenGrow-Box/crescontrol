@@ -84,7 +84,9 @@ class CresOutputLightEntity(CoordinatorEntity, LightEntity):
 
     @property
     def available(self) -> bool:
-        return self.coordinator.last_update_success and self.coordinator.data is not None
+        return (self.coordinator.last_update_success
+                and self.coordinator.data is not None
+                and "outputs" not in self.coordinator.subsystem_failures)
 
     def _update_from_coordinator(self):
         """Update local state from coordinator data."""
@@ -183,7 +185,9 @@ class CresSwitchLightEntity(CoordinatorEntity, LightEntity):
 
     @property
     def available(self) -> bool:
-        return self.coordinator.last_update_success and self.coordinator.data is not None
+        return (self.coordinator.last_update_success
+                and self.coordinator.data is not None
+                and "switches" not in self.coordinator.subsystem_failures)
 
     def _update_from_coordinator(self):
         """Update local state from coordinator data."""
@@ -243,7 +247,9 @@ class CresFanLightEntity(CoordinatorEntity, LightEntity):
 
     @property
     def available(self) -> bool:
-        return self.coordinator.last_update_success and self.coordinator.data is not None
+        return (self.coordinator.last_update_success
+                and self.coordinator.data is not None
+                and "fan" not in self.coordinator.subsystem_failures)
 
     def _update_from_coordinator(self):
         """Update local state from coordinator data."""

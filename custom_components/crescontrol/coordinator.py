@@ -10,6 +10,11 @@ from custom_components.crescontrol.const import DEFAULT_SCAN_INTERVAL, DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
 
+# Circuit breaker: after this many consecutive failures, increase poll interval
+MAX_CONSECUTIVE_FAILURES = 3
+# Maximum poll interval in seconds (5 minutes)
+MAX_POLL_INTERVAL = 300
+
 
 class CresControlCoordinator(DataUpdateCoordinator):
     """Coordinator to manage the integration with the CresControl system."""
@@ -17,14 +22,16 @@ class CresControlCoordinator(DataUpdateCoordinator):
     def __init__(self, hass: HomeAssistant, config_entry: ConfigEntry, controller: CresControl) -> None:
         """Initialize the coordinator."""
         self.host = config_entry.data[CONF_HOST]
-        self.poll_interval = config_entry.options.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL)
+        self.base_poll_interval = config_entry.options.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL)
+        self._current_poll_interval = self.base_poll_interval
+        self._consecutive_failures = 0
         self.controller = controller
         super().__init__(
             hass,
             _LOGGER,
             name=f"{DOMAIN} ({config_entry.unique_id})",
             update_method=self.async_update_data,
-            update_interval=timedelta(seconds=self.poll_interval),
+            update_interval=timedelta(seconds=self._current_poll_interval),
         )
 
     async def async_update_data(self):
@@ -32,26 +39,33 @@ class CresControlCoordinator(DataUpdateCoordinator):
         
         On partial failure, returns previously cached data if available
         to avoid all entities going unavailable.
+        Implements circuit breaker: increases poll interval after consecutive failures.
         """
         try:
             _LOGGER.debug("Updating CresControl data from API")
 
-            # Initialize devices only if they haven't been initialized
             if not self.controller._initialized:
                 try:
                     await self.controller.init_devices()
                 except Exception as init_err:
                     _LOGGER.warning(f"Device initialization failed: {init_err}")
-                    # If we have cached data, keep using it
                     if self.data:
-                        _LOGGER.info("Using cached data due to initialization failure")
+                        _LOGGER.debug("Using cached data due to initialization failure")
                         return self.data
                     raise
 
-            # Update all devices with consolidated requests
             await self.controller.update_all()
 
-            # Collect and organize data
+            # Success: reset circuit breaker
+            self._consecutive_failures = 0
+            if self._current_poll_interval != self.base_poll_interval:
+                self._current_poll_interval = self.base_poll_interval
+                self.update_interval = timedelta(seconds=self._current_poll_interval)
+                _LOGGER.info(
+                    "Device reachable again, restored poll interval to %ds",
+                    self._current_poll_interval,
+                )
+
             data = {
                 "fan": self.collect_fan_data(),
                 "switches": self.collect_switch_data(),
@@ -67,18 +81,47 @@ class CresControlCoordinator(DataUpdateCoordinator):
             _LOGGER.error("API Auth Error: %s", err)
             raise UpdateFailed("Authentication Error") from err
         except UpdateFailed:
-            # If update failed but we have cached data, keep using it
             if self.data:
-                _LOGGER.warning("Update failed, keeping previously cached data")
+                self._consecutive_failures += 1
+                await self._adjust_poll_interval()
+                _LOGGER.debug(
+                    "Update failed (consecutive failures: %d), keeping cached data",
+                    self._consecutive_failures,
+                )
                 return self.data
             raise
         except Exception as err:
-            _LOGGER.error("Error communicating with API: %s", err)
-            # If we have cached data, keep using it instead of making all entities unavailable
+            self._consecutive_failures += 1
+            await self._adjust_poll_interval()
             if self.data:
-                _LOGGER.warning("Using cached data due to communication error")
+                _LOGGER.debug(
+                    "Communication error (consecutive failures: %d), using cached data",
+                    self._consecutive_failures,
+                )
                 return self.data
+            _LOGGER.error("Error communicating with API: %s", err)
             raise UpdateFailed("Error communicating with API") from err
+
+    async def _adjust_poll_interval(self):
+        """Increase poll interval when device is unreachable (circuit breaker)."""
+        if self._consecutive_failures >= MAX_CONSECUTIVE_FAILURES:
+            new_interval = min(
+                self.base_poll_interval * (2 ** (self._consecutive_failures - MAX_CONSECUTIVE_FAILURES + 1)),
+                MAX_POLL_INTERVAL,
+            )
+            if new_interval != self._current_poll_interval:
+                self._current_poll_interval = new_interval
+                self.update_interval = timedelta(seconds=self._current_poll_interval)
+                _LOGGER.warning(
+                    "Device unreachable for %d consecutive polls, reduced update frequency to %ds",
+                    self._consecutive_failures,
+                    self._current_poll_interval,
+                )
+
+    @property
+    def subsystem_failures(self) -> set[str]:
+        """Return set of subsystem names that failed on the last update."""
+        return self.controller.subsystem_failures
 
     async def async_update_single_device(self, device_id: str):
         """Update a specific device by its ID."""

@@ -53,6 +53,7 @@ class CresControl:
         self.switches = CresSwitches(reqAddr, active_switches, session)
         self.devices = []
         self._initialized = False
+        self.subsystem_failures: set[str] = set()
         
         # Initialize placeholders for data
         self.system_data = None
@@ -89,7 +90,7 @@ class CresControl:
                     )
                 )
         except Exception as e:
-            _LOGGER.warning(f"Sensor initialization failed: {e}")
+            _LOGGER.debug(f"Sensor initialization failed: {e}")
             init_errors.append(("sensors", e))
 
         # Initialize Fan only if enabled
@@ -113,7 +114,7 @@ class CresControl:
                     )
                     self.devices.append(fan_device)
             except Exception as e:
-                _LOGGER.warning(f"Fan initialization failed: {e}")
+                _LOGGER.debug(f"Fan initialization failed: {e}")
                 init_errors.append(("fan", e))
 
         # Initialize Outputs - only active ones
@@ -131,7 +132,7 @@ class CresControl:
                         )
                     )
             except Exception as e:
-                _LOGGER.warning(f"Outputs initialization failed: {e}")
+                _LOGGER.debug(f"Outputs initialization failed: {e}")
                 init_errors.append(("outputs", e))
 
         # Initialize Inputs - only active ones
@@ -149,7 +150,7 @@ class CresControl:
                         )
                     )
             except Exception as e:
-                _LOGGER.warning(f"Inputs initialization failed: {e}")
+                _LOGGER.debug(f"Inputs initialization failed: {e}")
                 init_errors.append(("inputs", e))
 
         # Initialize Switches - only active ones
@@ -167,7 +168,7 @@ class CresControl:
                         )
                     )
             except Exception as e:
-                _LOGGER.warning(f"Switches initialization failed: {e}")
+                _LOGGER.debug(f"Switches initialization failed: {e}")
                 init_errors.append(("switches", e))
         
         # Mark as initialized if at least some devices were created
@@ -200,7 +201,7 @@ class CresControl:
                     sensor_id = device.device_id
                     device.state = sanitized_sensor_data.get(sensor_id, {})
         except Exception as e:
-            _LOGGER.warning(f"Sensors update failed, keeping previous state: {e}")
+            _LOGGER.debug(f"Sensors update failed, keeping previous state: {e}")
             raise
 
     async def update_fan(self):
@@ -217,7 +218,7 @@ class CresControl:
             if fan_device:
                 fan_device.state = self.fan_data.copy()
         except Exception as e:
-            _LOGGER.warning(f"Fan update failed, keeping previous state: {e}")
+            _LOGGER.debug(f"Fan update failed, keeping previous state: {e}")
             raise
 
     async def update_inputs(self):
@@ -229,7 +230,7 @@ class CresControl:
                 if device.device_type == DeviceType.INPUT:
                     device.state = self.inputs.inputs_data.get(device.device_id, {}).copy()
         except Exception as e:
-            _LOGGER.warning(f"Inputs update failed, keeping previous state: {e}")
+            _LOGGER.debug(f"Inputs update failed, keeping previous state: {e}")
             raise
 
     async def update_outputs(self):
@@ -241,7 +242,7 @@ class CresControl:
                 if device.device_type == DeviceType.OUTPUT:
                     device.state = self.outputs_data.get(device.device_id, {}).copy()
         except Exception as e:
-            _LOGGER.warning(f"Outputs update failed, keeping previous state: {e}")
+            _LOGGER.debug(f"Outputs update failed, keeping previous state: {e}")
             raise
 
     async def update_switches(self):
@@ -253,7 +254,7 @@ class CresControl:
                 if device.device_type == DeviceType.SWITCH:
                     device.state = self.switches.switch_data.get(device.device_id, {}).copy()
         except Exception as e:
-            _LOGGER.warning(f"Switches update failed, keeping previous state: {e}")
+            _LOGGER.debug(f"Switches update failed, keeping previous state: {e}")
             raise
 
     async def update_all(self):
@@ -270,19 +271,21 @@ class CresControl:
             ("switches", self.update_switches),
         ]
         
+        self.subsystem_failures.clear()
         errors = []
         for name, update_func in updates:
             try:
                 await update_func()
             except Exception as e:
-                _LOGGER.warning(f"Subsystem '{name}' update failed: {e}")
+                _LOGGER.debug(f"Subsystem '{name}' update failed: {e}")
+                self.subsystem_failures.add(name)
                 errors.append((name, e))
         
         if len(errors) == len(updates):
-            _LOGGER.error(f"All {len(updates)} subsystems failed to update")
+            _LOGGER.warning(f"All {len(updates)} subsystems failed to update")
             raise UpdateFailed(f"All {len(updates)} subsystems failed") from errors[0][1]
         elif errors:
-            _LOGGER.info(f"Partial update completed: {len(updates) - len(errors)}/{len(updates)} subsystems OK")
+            _LOGGER.debug(f"Partial update: {len(updates) - len(errors)}/{len(updates)} subsystems OK")
 
     async def fetch_sensor_data(self, sensor_id):
         return self.sensors.sensor_data.get(sensor_id, {})

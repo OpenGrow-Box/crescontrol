@@ -33,7 +33,7 @@ class CresSwitches:
         request_string = ";".join(request_parts)
         response = await self.req._get_request(request_string)
 
-        if response is None or (isinstance(response, str) and "error" in response.lower()):
+        if response is None or (isinstance(response, str) and (not response.strip() or response.lower().startswith("error"))):
             raise ValueError(f"Error fetching switch data: {response}")
 
         try:

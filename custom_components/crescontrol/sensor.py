@@ -91,7 +91,9 @@ class CresSensorEntity(CoordinatorEntity, SensorEntity):
 
     @property
     def available(self) -> bool:
-        return self.coordinator.last_update_success and self.coordinator.data is not None
+        return (self.coordinator.last_update_success
+                and self.coordinator.data is not None
+                and "sensors" not in self.coordinator.subsystem_failures)
 
     @property
     def unique_id(self):
@@ -173,7 +175,9 @@ class CresInputSensorEntity(CoordinatorEntity, SensorEntity):
 
     @property
     def available(self) -> bool:
-        return self.coordinator.last_update_success and self.coordinator.data is not None
+        return (self.coordinator.last_update_success
+                and self.coordinator.data is not None
+                and "inputs" not in self.coordinator.subsystem_failures)
 
     @property
     def unique_id(self):
@@ -254,7 +258,9 @@ class CresOutputStatusSensor(CoordinatorEntity, SensorEntity):
 
     @property
     def available(self) -> bool:
-        return self.coordinator.last_update_success and self.coordinator.data is not None
+        return (self.coordinator.last_update_success
+                and self.coordinator.data is not None
+                and "outputs" not in self.coordinator.subsystem_failures)
 
     @property
     def unique_id(self):

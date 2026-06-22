@@ -1,6 +1,7 @@
 import aiohttp
 import asyncio
 import logging
+import random
 from typing import Optional
 
 _LOGGER = logging.getLogger(__name__)
@@ -15,8 +16,10 @@ MAX_URL_LENGTH = 1800
 REQUEST_TIMEOUT = 15
 # Number of retries for failed requests
 MAX_RETRIES = 3
-# Delay between retries in seconds
-RETRY_DELAY = 1
+# Base delay for exponential backoff between retries
+RETRY_BASE_DELAY = 1
+# Maximum delay for retry backoff
+RETRY_MAX_DELAY = 10
 # Delay between requests to avoid overwhelming the device
 REQUEST_DELAY = 0.5
 
@@ -38,6 +41,11 @@ class CresRequestTimeout(CresRequestError):
 
 class CresRequestConnectionError(CresRequestError):
     """Raised when a connection error occurs."""
+    pass
+
+
+class CresRequestAuthError(CresRequestError):
+    """Raised on HTTP 401/403 (authentication/authorization failure)."""
     pass
 
 
@@ -128,7 +136,7 @@ class CresRequest:
                                 return content
                             else:
                                 content = await response.text()
-                                _LOGGER.warning(
+                                _LOGGER.debug(
                                     f"Unexpected content type '{content_type}', returning raw text"
                                 )
                                 return content
@@ -137,34 +145,50 @@ class CresRequest:
                             raise CresRequestURITooLong(
                                 f"URI Too Long ({len(url)} chars). Split your request into smaller batches."
                             )
+                        elif response.status in (401, 403):
+                            raise CresRequestAuthError(
+                                f"Authentication error (HTTP {response.status})"
+                            )
                         else:
                             response.raise_for_status()
                             
                 except CresRequestURITooLong:
-                    # Don't retry URI too long errors
+                    raise
+                except CresRequestAuthError:
                     raise
                 except asyncio.TimeoutError as e:
                     last_error = CresRequestTimeout(f"Request timeout (attempt {attempt}/{MAX_RETRIES})")
-                    _LOGGER.warning(f"Request timeout (attempt {attempt}/{MAX_RETRIES}): {url}")
+                    if attempt < MAX_RETRIES:
+                        _LOGGER.debug(f"Request timeout (attempt {attempt}/{MAX_RETRIES}): {url}")
+                    else:
+                        _LOGGER.warning(f"Request timeout (attempt {attempt}/{MAX_RETRIES}): {url}")
                 except aiohttp.ClientConnectionError as e:
                     last_error = CresRequestConnectionError(f"Connection error (attempt {attempt}/{MAX_RETRIES}): {e}")
-                    _LOGGER.warning(f"Connection error (attempt {attempt}/{MAX_RETRIES}): {e}")
-                    # Close session on connection error to force new connection next time
+                    if attempt < MAX_RETRIES:
+                        _LOGGER.debug(f"Connection error (attempt {attempt}/{MAX_RETRIES}): {e}")
+                    else:
+                        _LOGGER.warning(f"Connection error (attempt {attempt}/{MAX_RETRIES}): {e}")
                     await self.close()
                 except aiohttp.ClientResponseError as e:
                     last_error = CresRequestError(f"HTTP {e.status}: {e.message} (attempt {attempt}/{MAX_RETRIES})")
-                    _LOGGER.warning(f"HTTP error {e.status} (attempt {attempt}/{MAX_RETRIES}): {url}")
+                    if attempt < MAX_RETRIES:
+                        _LOGGER.debug(f"HTTP error {e.status} (attempt {attempt}/{MAX_RETRIES}): {url}")
+                    else:
+                        _LOGGER.warning(f"HTTP error {e.status} (attempt {attempt}/{MAX_RETRIES}): {url}")
                 except Exception as e:
                     last_error = CresRequestError(f"Unexpected error (attempt {attempt}/{MAX_RETRIES}): {e}")
-                    _LOGGER.warning(f"Unexpected error (attempt {attempt}/{MAX_RETRIES}): {e}")
+                    if attempt < MAX_RETRIES:
+                        _LOGGER.debug(f"Unexpected error (attempt {attempt}/{MAX_RETRIES}): {e}")
+                    else:
+                        _LOGGER.warning(f"Unexpected error (attempt {attempt}/{MAX_RETRIES}): {e}")
                 
-                # Wait before retry (except on last attempt)
                 if attempt < MAX_RETRIES:
-                    wait_time = RETRY_DELAY * attempt  # Progressive backoff
-                    _LOGGER.debug(f"Waiting {wait_time}s before retry...")
+                    wait_time = min(RETRY_BASE_DELAY * (2 ** (attempt - 1)), RETRY_MAX_DELAY)
+                    jitter = random.uniform(0, wait_time * 0.5)
+                    wait_time += jitter
+                    _LOGGER.debug(f"Waiting {wait_time:.1f}s before retry...")
                     await asyncio.sleep(wait_time)
             
-            # All retries exhausted
             _LOGGER.error(f"All {MAX_RETRIES} attempts failed for: {url}")
             raise last_error
 

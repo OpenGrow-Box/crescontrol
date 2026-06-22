@@ -64,7 +64,9 @@ class CresFanEntity(CoordinatorEntity, FanEntity):
 
     @property
     def available(self) -> bool:
-        return self.coordinator.last_update_success and self.coordinator.data is not None
+        return (self.coordinator.last_update_success
+                and self.coordinator.data is not None
+                and "fan" not in self.coordinator.subsystem_failures)
 
     @property
     def unique_id(self):
@@ -182,7 +184,9 @@ class CresOutputFanEntity(CoordinatorEntity, FanEntity):
 
     @property
     def available(self) -> bool:
-        return self.coordinator.last_update_success and self.coordinator.data is not None
+        return (self.coordinator.last_update_success
+                and self.coordinator.data is not None
+                and "outputs" not in self.coordinator.subsystem_failures)
 
     @property
     def unique_id(self):
@@ -312,7 +316,9 @@ class CresSwitchFanEntity(CoordinatorEntity, FanEntity):
 
     @property
     def available(self) -> bool:
-        return self.coordinator.last_update_success and self.coordinator.data is not None
+        return (self.coordinator.last_update_success
+                and self.coordinator.data is not None
+                and "switches" not in self.coordinator.subsystem_failures)
 
     @property
     def unique_id(self):
